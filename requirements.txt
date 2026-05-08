@@ -1,0 +1,25 @@
+# FastAPI
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+slowapi==0.1.9
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# Security
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+cryptography==44.0.0
+
+# Validation (versiones compatibles con Python 3.14)
+pydantic==2.13.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# Utils
+python-dotenv==1.0.1
+phonenumbers==9.0.3
