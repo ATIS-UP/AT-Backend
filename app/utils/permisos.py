@@ -6,11 +6,18 @@ from app.models.user import User, Permiso, UserPermiso, RolEnum
 
 
 PERMISOS_BASE_POR_ROL = {
-    RolEnum.ADMINISTRADOR: "*",  # Todos los permisos
-    RolEnum.DOCENTE: "*",         # Todos los permisos
-    RolEnum.APOYO: [              # Solo permisos específicos
+    RolEnum.ADMINISTRADOR: "*",  # all permissions
+    RolEnum.DOCENTE: "*",         # all permissions
+    RolEnum.APOYO: [              # limited permissions for support role
+        "ver_estudiantes",
         "crear_estudiante",
-        "crear_alerta"
+        "editar_estudiante",
+        "ver_alertas",
+        "crear_alerta",
+        "cambiar_estado_alerta",
+        "ver_actividades",
+        "crear_actividad",
+        "ver_dashboard",
     ]
 }
 
