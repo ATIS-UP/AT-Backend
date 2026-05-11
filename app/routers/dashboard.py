@@ -1,46 +1,24 @@
-"""Router de dashboard y estadísticas"""
+"""router for dashboard and statistics"""
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.dependencies import require_permiso
 from app.models.user import User
 from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.models.alerta import Alerta, NivelRiesgo, EstadoSeguimiento
-from app.utils.auth import verify_token
-from app.utils.permisos import PermisoService
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
-security = HTTPBearer()
-
-
-def get_current_user_with_permiso(
-    db: Session = Depends(get_db),
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> User:
-    token = credentials.credentials
-    payload = verify_token(token, "access")
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-
-    user = db.query(User).filter(User.id == payload.get("sub")).first()
-    if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario inactivo")
-    return user
 
 
 @router.get("/resumen")
 async def get_resumen(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("ver_dashboard"))
 ):
-    """Obtener resumen general del dashboard"""
-    if not PermisoService.tiene_permiso(db, current_user, "ver_dashboard"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
-    # Contadores básicos
+    """get general dashboard summary"""
     total_estudiantes = db.query(Estudiante).count()
     activos = db.query(Estudiante).filter(Estudiante.estado == EstadoEstudiante.ACTIVO).count()
 
@@ -50,7 +28,6 @@ async def get_resumen(
     en_proceso = db.query(Alerta).filter(Alerta.estado_seguimiento == EstadoSeguimiento.EN_PROCESO).count()
     resueltas = db.query(Alerta).filter(Alerta.estado_seguimiento == EstadoSeguimiento.RESUELTO).count()
 
-    # Distribución por programa
     programas = db.query(
         Estudiante.programa,
         func.count(Estudiante.id).label("total")
@@ -58,7 +35,6 @@ async def get_resumen(
 
     programas_dist = [{"programa": p.programa, "total": p.total} for p in programas]
 
-    # Tendencia de alertas por período
     alertas_por_periodo = db.query(
         Alerta.periodo,
         func.count(Alerta.id).label("total")
@@ -87,13 +63,9 @@ async def get_resumen(
 async def get_estados(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("ver_dashboard"))
 ):
-    """Obtener estados de estudiantes y alertas"""
-    if not PermisoService.tiene_permiso(db, current_user, "ver_dashboard"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
-    # Estados de estudiantes
+    """get student and alert states"""
     estados_est = db.query(
         Estudiante.estado,
         func.count(Estudiante.id).label("total")
@@ -101,7 +73,6 @@ async def get_estados(
 
     estados_estudiantes = [{"estado": e.estado.value, "total": e.total} for e in estados_est]
 
-    # Estados de seguimiento de alertas
     estados_alert = db.query(
         Alerta.estado_seguimiento,
         func.count(Alerta.id).label("total")
@@ -109,7 +80,6 @@ async def get_estados(
 
     estados_alertas = [{"estado": e.estado_seguimiento.value, "total": e.total} for e in estados_alert]
 
-    # Niveles de riesgo
     niveles = db.query(
         Alerta.nivel_riesgo,
         func.count(Alerta.id).label("total")
@@ -128,16 +98,11 @@ async def get_estados(
 async def get_recientes(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso),
+    current_user: User = Depends(require_permiso("ver_dashboard")),
     limite: int = Query(10, ge=1, le=50)
 ):
-    """Obtener alertas recientes"""
-    if not PermisoService.tiene_permiso(db, current_user, "ver_dashboard"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """get recent alerts"""
     alertas = db.query(Alerta).order_by(Alerta.created_at.desc()).limit(limite).all()
-
-    from app.utils.security import decrypt_data
 
     return {
         "alertas_recientes": [
