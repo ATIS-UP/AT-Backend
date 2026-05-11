@@ -4,18 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.database import engine, Base
-from app.routers import auth, estudiantes, alertas, admin, dashboard
+from app.error_handlers import register_error_handlers
+from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle de la aplicación"""
-    # Startup: crear tablas si no existen
-    Base.metadata.create_all(bind=engine)
+    """application lifecycle. schema managed by alembic migrations."""
     yield
-    # Shutdown
-    pass
 
 
 app = FastAPI(
@@ -25,15 +21,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS - permitir múltiples origins para desarrollo
+# Global error handlers
+register_error_handlers(app)
+
+# CORS - origins configured via CORS_ORIGIN env var (comma-separated)
+origins = [origin.strip() for origin in settings.CORS_ORIGIN.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
@@ -45,6 +41,9 @@ app.include_router(estudiantes.router)
 app.include_router(alertas.router)
 app.include_router(admin.router)
 app.include_router(dashboard.router)
+app.include_router(encuestas.router)
+app.include_router(artefactos.router)
+app.include_router(parametrizacion.router)
 
 
 @app.get("/")
