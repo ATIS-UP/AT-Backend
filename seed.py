@@ -57,11 +57,11 @@ def seed_permisos(conn):
     """Crea el catálogo de permisos"""
     print("Creando permisos...")
     for codigo, nombre, descripcion, categoria in PERMISOS_CATALOGO:
-        conn.execute(text(f"""
+        conn.execute(text("""
             INSERT INTO permisos (id, codigo, nombre, descripcion, categoria)
-            SELECT gen_random_uuid(), '{codigo}', '{nombre}', '{descripcion}', '{categoria}'
-            WHERE NOT EXISTS (SELECT 1 FROM permisos WHERE codigo = '{codigo}')
-        """))
+            SELECT gen_random_uuid(), :codigo, :nombre, :descripcion, :categoria
+            WHERE NOT EXISTS (SELECT 1 FROM permisos WHERE codigo = :codigo)
+        """), {"codigo": codigo, "nombre": nombre, "descripcion": descripcion, "categoria": categoria})
     print(f"  - {len(PERMISOS_CATALOGO)} permisos creados/verificados")
 
 
@@ -70,18 +70,18 @@ def seed_usuarios(conn):
     print("Creando usuarios...")
 
     usuarios = [
-        ("admin@unipamplona.edu", "Admin123!", "Administrador Sistema", "ADMINISTRADOR"),
-        ("docente@unipamplona.edu", "Docente123!", "Docente Principal", "DOCENTE"),
-        ("apoyo@unipamplona.edu", "Apoyo123!", "Usuario de Apoyo", "APOYO")
+        ("admin@unipamplona.edu.co", "Admin123!", "Administrador Sistema", "ADMINISTRADOR"),
+        ("docente@unipamplona.edu.co", "Docente123!", "Docente Principal", "DOCENTE"),
+        ("apoyo@unipamplona.edu.co", "Apoyo123!", "Usuario de Apoyo", "APOYO")
     ]
 
     for email, password, nombre, rol in usuarios:
         password_hash = hash_password(password)
-        conn.execute(text(f"""
+        conn.execute(text("""
             INSERT INTO users (id, email, password_hash, nombre, rol, is_active, is_verified)
-            SELECT gen_random_uuid(), '{email}', '{password_hash}', '{nombre}', '{rol}'::rolenum, true, true
-            WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = '{email}')
-        """))
+            SELECT gen_random_uuid(), :email, :password_hash, :nombre, CAST(:rol AS rolenum), true, true
+            WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = :email)
+        """), {"email": email, "password_hash": password_hash, "nombre": nombre, "rol": rol})
         print(f"  - Usuario: {email} ({rol})")
 
     print("  - Usuarios creados/verificados")
@@ -99,11 +99,11 @@ def seed_parametrizacion(conn):
     ]
 
     for clave, valor, descripcion, tipo in parametros:
-        conn.execute(text(f"""
+        conn.execute(text("""
             INSERT INTO parametrizacion (id, clave, valor, descripcion, tipo)
-            SELECT gen_random_uuid(), '{clave}', '{valor}', '{descripcion}', '{tipo}'
-            WHERE NOT EXISTS (SELECT 1 FROM parametrizacion WHERE clave = '{clave}')
-        """))
+            SELECT gen_random_uuid(), :clave, :valor, :descripcion, :tipo
+            WHERE NOT EXISTS (SELECT 1 FROM parametrizacion WHERE clave = :clave)
+        """), {"clave": clave, "valor": valor, "descripcion": descripcion, "tipo": tipo})
 
     print(f"  - {len(parametros)} parámetros creados/verificados")
 
