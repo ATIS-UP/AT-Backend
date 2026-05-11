@@ -1,10 +1,14 @@
 """Utilidades de seguridad: encriptación y hashing"""
+import logging
+
 from passlib.context import CryptContext
 from cryptography.fernet import Fernet, InvalidToken
 import base64
 import hashlib
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Contexto para hashing de contraseñas (bcrypt)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -42,7 +46,8 @@ def decrypt_data(encrypted_data: str) -> str:
         decrypted = fernet.decrypt(encrypted_data.encode())
         return decrypted.decode()
     except InvalidToken:
-        return ""  # Datos no encriptados o corruptos
+        logger.error("fernet decryption failed for data, returning corrupted marker")
+        return "[DATO_CORRUPTO]"
     except Exception as e:
         raise ValueError(f"Error al desencriptar: {str(e)}")
 
@@ -69,3 +74,15 @@ def generate_encryption_key() -> str:
 def hash_data(data: str) -> str:
     """Genera un hash SHA-256 de datos"""
     return hashlib.sha256(data.encode()).hexdigest()
+
+
+def sanitize_like_param(value: str, max_length: int = 200) -> str:
+    """escape special characters for safe use in sql like filters"""
+    if not value:
+        return value
+    value = value[:max_length]
+    # escape sql like special chars
+    value = value.replace("\\", "\\\\")
+    value = value.replace("%", "\\%")
+    value = value.replace("_", "\\_")
+    return value

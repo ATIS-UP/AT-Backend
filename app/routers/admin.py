@@ -1,37 +1,20 @@
-"""Router de administración - gestión de usuarios y permisos"""
+"""router for admin operations - user and permission management"""
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_user, require_permiso
 from app.models.user import User, Permiso, UserPermiso, RolEnum
 from app.schemas.auth import (
     UserCreate, UserUpdate, UserResponse, UserPermisoUpdate,
     UserPermisosResponse, PermisoResponse
 )
-from app.utils.auth import verify_token
-from app.utils.security import hash_password
+from app.utils.security import hash_password, sanitize_like_param
 from app.utils.permisos import PermisoService
 from app.utils.audit import AuditService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-security = HTTPBearer()
-
-
-def get_current_user_with_permiso(
-    db: Session = Depends(get_db),
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> User:
-    token = credentials.credentials
-    payload = verify_token(token, "access")
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-
-    user = db.query(User).filter(User.id == payload.get("sub")).first()
-    if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario inactivo")
-    return user
 
 
 # ====== USUARIOS ======
@@ -40,22 +23,20 @@ def get_current_user_with_permiso(
 async def list_usuarios(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso),
+    current_user: User = Depends(require_permiso("gestionar_usuarios")),
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(20, ge=1, le=100),
     buscar: str = Query(None),
     rol: str = Query(None)
 ):
-    """Listar usuarios (solo admin)"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_usuarios"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """list users (admin only)"""
     query = db.query(User)
 
     if buscar:
+        safe_buscar = sanitize_like_param(buscar)
         query = query.filter(
-            (User.email.ilike(f"%{buscar}%")) |
-            (User.nombre.ilike(f"%{buscar}%"))
+            (User.email.ilike(f"%{safe_buscar}%")) |
+            (User.nombre.ilike(f"%{safe_buscar}%"))
         )
     if rol:
         query = query.filter(User.rol == rol)
@@ -79,12 +60,9 @@ async def get_usuario(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("gestionar_usuarios"))
 ):
-    """Obtener usuario por ID"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_usuarios"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """get user by id"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
@@ -106,18 +84,14 @@ async def create_usuario(
     user_data: UserCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("gestionar_usuarios"))
 ):
-    """Crear un nuevo usuario (solo admin)"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_usuarios"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
-    # Verificar que el email no exista
+    """create a new user (admin only)"""
+    # verify email is not taken
     existente = db.query(User).filter(User.email == user_data.email).first()
     if existente:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El email ya está en uso")
 
-    # Crear usuario
     nuevo = User(
         email=user_data.email,
         password_hash=hash_password(user_data.password),
@@ -151,12 +125,9 @@ async def update_usuario(
     user_data: UserUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("gestionar_usuarios"))
 ):
-    """Actualizar un usuario"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_usuarios"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """update a user"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
@@ -190,17 +161,13 @@ async def delete_usuario(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("gestionar_usuarios"))
 ):
-    """Eliminar un usuario (soft delete - desactivar)"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_usuarios"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """delete a user (soft delete - deactivate)"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
 
-    # No permitir eliminarse a sí mismo
     if user.id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No puedes eliminarte a ti mismo")
 
@@ -219,12 +186,9 @@ async def delete_usuario(
 async def get_all_permisos(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("gestionar_usuarios"))
 ):
-    """Obtener todos los permisos del catálogo"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_usuarios"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """get all permissions from catalog"""
     return PermisoService.get_permisos_por_categoria(db)
 
 
@@ -233,19 +197,15 @@ async def get_usuario_permisos(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("gestionar_usuarios"))
 ):
-    """Obtener permisos de un usuario específico"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_usuarios"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """get permissions for a specific user"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
 
     permisos = PermisoService.get_permisos_usuario(db, user)
 
-    # Obtener overrides
     overrides = db.query(UserPermiso).filter(UserPermiso.user_id == user_id).all()
     overrides_list = [{"codigo": o.permiso_codigo, "tiene_permiso": o.tiene_permiso} for o in overrides]
 
@@ -263,21 +223,16 @@ async def update_usuario_permisos(
     permisos_data: UserPermisoUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_with_permiso)
+    current_user: User = Depends(require_permiso("gestionar_permisos"))
 ):
-    """Actualizar permisos de un usuario (overrides)"""
-    if not PermisoService.tiene_permiso(db, current_user, "gestionar_permisos"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso")
-
+    """update user permissions (overrides)"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
 
-    # Actualizar overrides
     for perm in permisos_data.permisos:
         PermisoService.set_permiso_usuario(db, user_id, perm["codigo"], perm["tiene_permiso"])
 
-    # Retornar permisos actualizados
     permisos = PermisoService.get_permisos_usuario(db, user)
     overrides = db.query(UserPermiso).filter(UserPermiso.user_id == user_id).all()
     overrides_list = [{"codigo": o.permiso_codigo, "tiene_permiso": o.tiene_permiso} for o in overrides]
