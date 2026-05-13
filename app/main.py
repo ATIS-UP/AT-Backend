@@ -5,12 +5,15 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.error_handlers import register_error_handlers
-from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion
+from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos
+from app.database import Base, engine
+from app.models.caso_especial import RegistroCasoEspecial, HistorialRegistro
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """application lifecycle. schema managed by alembic migrations."""
+    """application lifecycle. create tables if not exist."""
+    Base.metadata.create_all(bind=engine)
     yield
 
 
@@ -44,6 +47,7 @@ app.include_router(dashboard.router)
 app.include_router(encuestas.router)
 app.include_router(artefactos.router)
 app.include_router(parametrizacion.router)
+app.include_router(registros_casos.router)
 
 
 @app.get("/")

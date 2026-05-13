@@ -106,6 +106,7 @@ Esto creará:
 | admin@unipamplona.edu.co | Admin123! | ADMINISTRADOR |
 | docente@unipamplona.edu.co | Docente123! | DOCENTE |
 | apoyo@unipamplona.edu.co | Apoyo123! | APOYO |
+| pruebas@unipamplona.edu.co | Pruebas123! | DOCENTE |
 
 ## Estructura del Proyecto
 
