@@ -13,8 +13,15 @@ logger = logging.getLogger(__name__)
 # Contexto para hashing de contraseñas (bcrypt)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Fernet para encriptación de datos sensibles
-fernet = Fernet(settings.FERNET_KEY.encode())
+# Validate Fernet key at startup
+try:
+    if not settings.FERNET_KEY:
+        raise ValueError("FERNET_KEY environment variable is not set")
+    fernet = Fernet(settings.FERNET_KEY.encode())
+    logger.info("Fernet encryption key loaded successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Fernet key: {e}")
+    raise RuntimeError(f"Invalid FERNET_KEY configuration: {e}")
 
 
 def hash_password(password: str) -> str:
@@ -46,7 +53,8 @@ def decrypt_data(encrypted_data: str) -> str:
         decrypted = fernet.decrypt(encrypted_data.encode())
         return decrypted.decode()
     except InvalidToken:
-        logger.error("fernet decryption failed for data, returning corrupted marker")
+        data_preview = encrypted_data[:20] + "..." if len(encrypted_data) > 20 else encrypted_data
+        logger.warning(f"Fernet decryption failed for data starting with: {data_preview}. This may indicate the data was encrypted with a different key.")
         return "[DATO_CORRUPTO]"
     except Exception as e:
         raise ValueError(f"Error al desencriptar: {str(e)}")
