@@ -1,2 +1,2 @@
 """Routers del API"""
-from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion
+from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos
