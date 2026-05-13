@@ -52,19 +52,13 @@ class CasoEspecialService:
         
         q_lower = q.lower().strip()
         
-        codigo_match = q_lower.isdigit() or q_lower.replace("-", "").isdigit()
-        query = self.db.query(Estudiante)
+        # Obtener todos los estudiantes y filtrar en Python después de desencriptar
+        estudiantes = self.db.query(Estudiante).all()
         
-        if codigo_match:
-            query = query.filter(Estudiante.codigo.ilike(f"%{q}%"))
-        
-        estudiantes = query.all()
-        
-        if not codigo_match:
-            estudiantes = [
-                est for est in estudiantes
-                if self._matches_search(self._estudiante_to_info(est), q_lower)
-            ]
+        estudiantes = [
+            est for est in estudiantes
+            if self._matches_search(self._estudiante_to_info(est), q_lower)
+        ]
         
         estudiante_ids = [est.id for est in estudiantes]
         registros_dict = {}
@@ -98,10 +92,11 @@ class CasoEspecialService:
         return resultados_pagina, total
     
     def _matches_search(self, est_info: EstudianteInfo, q: str) -> bool:
+        matches_codigo = q in (est_info.codigo or "").lower()
         matches_documento = q in (est_info.documento or "").lower()
         matches_nombres = q in (est_info.nombres or "").lower()
         matches_apellidos = q in (est_info.apellidos or "").lower()
-        return matches_documento or matches_nombres or matches_apellidos
+        return matches_codigo or matches_documento or matches_nombres or matches_apellidos
 
     def crear(self, data: RegistroCasoCreate, usuario_id: str, usuario_nombre: str) -> RegistroCasoResponse:
         tipo_enum = TipoRegistroCaso(data.tipo)
@@ -202,6 +197,19 @@ class CasoEspecialService:
         self.db.commit()
         
         return self._registro_to_response(registro)
+    
+    def eliminar(self, registro_id: str) -> bool:
+        registro = self.db.query(RegistroCasoEspecial).filter(
+            RegistroCasoEspecial.id == UUID(registro_id)
+        ).first()
+        
+        if not registro:
+            return False
+        
+        self.db.delete(registro)
+        self.db.commit()
+        
+        return True
 
     def listar(self, pagina: int = 1, por_pagina: int = 20, estado: Optional[str] = None, tipo: Optional[str] = None) -> Tuple[List[RegistroCasoResponse], int]:
         query = self.db.query(RegistroCasoEspecial)

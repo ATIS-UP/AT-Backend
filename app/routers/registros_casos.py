@@ -122,6 +122,20 @@ async def actualizar_registro(
     return registro
 
 
+@router.delete("/{registro_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def eliminar_registro(
+    registro_id: str,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permiso("editar_registro_caso"))
+):
+    """Eliminar un registro de caso especial"""
+    service = get_service(db)
+    if not service.eliminar(registro_id):
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    return None
+
+
 @router.get("/{registro_id}/historial", response_model=HistorialListResponse)
 async def obtener_historial(
     registro_id: str,
