@@ -52,3 +52,4 @@ class ActividadInstitucional(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     creador = relationship("User", foreign_keys=[creador_id])
+    archivos_anexos = relationship("AnexoActividad", back_populates="actividad", cascade="all, delete-orphan")

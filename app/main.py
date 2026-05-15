@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.error_handlers import register_error_handlers
-from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos, actividades_institucionales
+from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos, actividades_institucionales, anexos_actividades
 from app.database import Base, engine
 from app.models.caso_especial import RegistroCasoEspecial, HistorialRegistro
 
@@ -49,6 +49,7 @@ app.include_router(artefactos.router)
 app.include_router(parametrizacion.router)
 app.include_router(registros_casos.router)
 app.include_router(actividades_institucionales.router)
+app.include_router(anexos_actividades.router)
 
 
 @app.get("/")

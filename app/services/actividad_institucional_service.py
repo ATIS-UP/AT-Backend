@@ -32,6 +32,7 @@ class ActividadInstitucionalService:
             encargado=actividad.encargado,
             observaciones=actividad.observaciones,
             anexos=actividad.anexos,
+            total_anexos=len(actividad.archivos_anexos) if actividad.archivos_anexos else 0,
             creador_id=str(actividad.creador_id),
             creador_nombre=creador_nombre,
             modalidad=actividad.modalidad.value if hasattr(actividad.modalidad, 'value') else str(actividad.modalidad),
@@ -41,7 +42,10 @@ class ActividadInstitucionalService:
         )
 
     def listar(self, pagina: int = 1, por_pagina: int = 20, estado: Optional[str] = None) -> Tuple[List[ActividadInstitucionalResponse], int]:
-        query = self.db.query(ActividadInstitucional).options(joinedload(ActividadInstitucional.creador))
+        query = self.db.query(ActividadInstitucional).options(
+            joinedload(ActividadInstitucional.creador),
+            joinedload(ActividadInstitucional.archivos_anexos),
+        )
 
         if estado:
             query = query.filter(ActividadInstitucional.estado == EstadoActividadInstitucional(estado))
@@ -53,7 +57,8 @@ class ActividadInstitucionalService:
 
     def obtener(self, actividad_id: str) -> Optional[ActividadInstitucionalResponse]:
         actividad = self.db.query(ActividadInstitucional).options(
-            joinedload(ActividadInstitucional.creador)
+            joinedload(ActividadInstitucional.creador),
+            joinedload(ActividadInstitucional.archivos_anexos),
         ).filter(
             ActividadInstitucional.id == UUID(actividad_id)
         ).first()

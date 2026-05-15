@@ -39,6 +39,7 @@ class ActividadInstitucionalResponse(BaseModel):
     encargado: str
     observaciones: Optional[str] = None
     anexos: Optional[str] = None
+    total_anexos: int = 0
     creador_id: str
     creador_nombre: str
     modalidad: str
