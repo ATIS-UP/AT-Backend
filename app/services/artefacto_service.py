@@ -3,35 +3,50 @@
 import os
 import uuid
 import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import boto3
+from botocore.exceptions import ClientError
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.alerta import Artefacto
 from app.utils.audit import AuditService
 
 
-# allowed file extensions
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg"}
 
-# max file size: 10mb
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
-# base upload directory
 UPLOAD_DIR = "uploads"
+
+DOWNLOAD_TEMP_DIR = "/tmp/at-downloads"
 
 
 class ArtefactoService:
-    """handles file artifact operations: upload, list, download, delete."""
-
     def __init__(self, db: Session):
         self.db = db
+        self.storage_backend = settings.STORAGE_BACKEND
+
+    def _get_s3_client(self):
+        endpoint = (
+            f"http://{settings.MINIO_ENDPOINT}"
+            if not settings.MINIO_USE_SSL
+            else f"https://{settings.MINIO_ENDPOINT}"
+        )
+        return boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            aws_access_key_id=settings.MINIO_ACCESS_KEY,
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            use_ssl=settings.MINIO_USE_SSL,
+        )
 
     def _validate_file(self, file: UploadFile) -> None:
-        """validate file extension and size."""
         if not file.filename:
             raise ValidationError("el nombre del archivo es requerido")
 
@@ -42,7 +57,6 @@ class ArtefactoService:
                 fields={"file": f"extension {ext} not allowed"},
             )
 
-        # read content to check size
         file.file.seek(0, 2)
         size = file.file.tell()
         file.file.seek(0)
@@ -54,7 +68,6 @@ class ArtefactoService:
             )
 
     def _get_storage_path(self, filename: str) -> str:
-        """generate organized storage path: uploads/{YYYY}/{MM}/{filename_uuid.ext}"""
         now = datetime.now()
         ext = os.path.splitext(filename)[1].lower()
         unique_name = f"{uuid.uuid4().hex}{ext}"
@@ -64,7 +77,6 @@ class ArtefactoService:
         return relative_path
 
     def _determine_tipo(self, filename: str) -> str:
-        """determine file type category from extension."""
         ext = os.path.splitext(filename)[1].lower()
         type_map = {
             ".pdf": "PDF",
@@ -76,6 +88,42 @@ class ArtefactoService:
         }
         return type_map.get(ext, "OTRO")
 
+    def _save_to_disk(self, file: UploadFile, relative_path: str) -> None:
+        absolute_path = os.path.abspath(relative_path)
+        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+        with open(absolute_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+    def _save_to_s3(self, file: UploadFile, key: str) -> None:
+        s3 = self._get_s3_client()
+        file.file.seek(0)
+        s3.upload_fileobj(file.file, settings.MINIO_BUCKET, key)
+
+    def _download_from_s3(self, key: str) -> str:
+        os.makedirs(DOWNLOAD_TEMP_DIR, exist_ok=True)
+        tmp = tempfile.NamedTemporaryFile(
+            delete=False, dir=DOWNLOAD_TEMP_DIR, suffix=os.path.splitext(key)[1]
+        )
+        try:
+            s3 = self._get_s3_client()
+            s3.download_fileobj(settings.MINIO_BUCKET, key, tmp)
+        except ClientError:
+            os.unlink(tmp.name)
+            raise EntityNotFoundError("Artefacto (archivo)", key)
+        return tmp.name
+
+    def _delete_from_disk(self, relative_path: str) -> None:
+        absolute_path = os.path.abspath(relative_path)
+        if os.path.exists(absolute_path):
+            os.remove(absolute_path)
+
+    def _delete_from_s3(self, key: str) -> None:
+        try:
+            s3 = self._get_s3_client()
+            s3.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)
+        except ClientError:
+            pass
+
     def subir(
         self,
         file: UploadFile,
@@ -84,20 +132,15 @@ class ArtefactoService:
         alerta_id: str = None,
         estudiante_id: str = None,
     ) -> dict:
-        """upload a file, validate, save to disk, create db record, audit log."""
         self._validate_file(file)
 
         relative_path = self._get_storage_path(file.filename)
-        absolute_path = os.path.abspath(relative_path)
 
-        # ensure directory exists
-        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+        if self.storage_backend == "s3":
+            self._save_to_s3(file, relative_path)
+        else:
+            self._save_to_disk(file, relative_path)
 
-        # save file to disk
-        with open(absolute_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # create db record
         artefacto = Artefacto(
             nombre=file.filename,
             tipo=self._determine_tipo(file.filename),
@@ -110,7 +153,6 @@ class ArtefactoService:
         self.db.commit()
         self.db.refresh(artefacto)
 
-        # audit log
         AuditService.log_crear(
             db=self.db,
             usuario_id=usuario_id,
@@ -134,7 +176,6 @@ class ArtefactoService:
     def listar(
         self, alerta_id: str = None, estudiante_id: str = None
     ) -> list[dict]:
-        """list artifacts filtered by alerta or estudiante."""
         query = self.db.query(Artefacto)
 
         if alerta_id:
@@ -160,7 +201,6 @@ class ArtefactoService:
         ]
 
     def obtener(self, artefacto_id: str) -> dict:
-        """get artifact metadata by id, raises EntityNotFoundError if not found."""
         artefacto = (
             self.db.query(Artefacto).filter(Artefacto.id == artefacto_id).first()
         )
@@ -179,12 +219,14 @@ class ArtefactoService:
         }
 
     def descargar(self, artefacto_id: str) -> str:
-        """return absolute file path for download, raises EntityNotFoundError if not found."""
         artefacto = (
             self.db.query(Artefacto).filter(Artefacto.id == artefacto_id).first()
         )
         if not artefacto:
             raise EntityNotFoundError("Artefacto", artefacto_id)
+
+        if self.storage_backend == "s3":
+            return self._download_from_s3(artefacto.url)
 
         absolute_path = os.path.abspath(artefacto.url)
         if not os.path.exists(absolute_path):
@@ -193,19 +235,17 @@ class ArtefactoService:
         return absolute_path
 
     def eliminar(self, artefacto_id: str, usuario_id: str, ip: str) -> None:
-        """delete file from disk and db record, audit log."""
         artefacto = (
             self.db.query(Artefacto).filter(Artefacto.id == artefacto_id).first()
         )
         if not artefacto:
             raise EntityNotFoundError("Artefacto", artefacto_id)
 
-        # remove file from disk if it exists
-        absolute_path = os.path.abspath(artefacto.url)
-        if os.path.exists(absolute_path):
-            os.remove(absolute_path)
+        if self.storage_backend == "s3":
+            self._delete_from_s3(artefacto.url)
+        else:
+            self._delete_from_disk(artefacto.url)
 
-        # audit log before deletion
         AuditService.log_eliminar(
             db=self.db,
             usuario_id=usuario_id,
@@ -215,6 +255,5 @@ class ArtefactoService:
             ip=ip,
         )
 
-        # delete db record
         self.db.delete(artefacto)
         self.db.commit()
