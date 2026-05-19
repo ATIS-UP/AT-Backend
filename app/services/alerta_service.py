@@ -1,4 +1,5 @@
 """service layer for alert operations"""
+from uuid import UUID
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -113,16 +114,24 @@ class AlertaService:
         self, data: AlertaCreate, usuario_id: str, ip: str
     ) -> AlertaResponse:
         """create a new alert, validate estudiante exists, encrypt promedios"""
-        estudiante = (
-            self.db.query(Estudiante)
-            .filter(Estudiante.id == data.estudiante_id)
-            .first()
-        )
+        try:
+            UUID(data.estudiante_id)
+            estudiante = (
+                self.db.query(Estudiante)
+                .filter(Estudiante.id == data.estudiante_id)
+                .first()
+            )
+        except ValueError:
+            estudiante = (
+                self.db.query(Estudiante)
+                .filter(Estudiante.codigo == data.estudiante_id)
+                .first()
+            )
         if not estudiante:
             raise EntityNotFoundError("Estudiante", data.estudiante_id)
 
         nueva = Alerta(
-            estudiante_id=data.estudiante_id,
+            estudiante_id=estudiante.id,
             materia_id=data.materia_id,
             nivel_riesgo=data.nivel_riesgo,
             descripcion=data.descripcion,
