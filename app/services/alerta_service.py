@@ -3,9 +3,9 @@ from uuid import UUID
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.exceptions import EntityNotFoundError
+from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.alerta import Alerta, Actividad, NivelRiesgo, EstadoSeguimiento
-from app.models.estudiante import Estudiante
+from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.schemas.alerta import (
     AlertaCreate,
     AlertaUpdate,
@@ -129,6 +129,9 @@ class AlertaService:
             )
         if not estudiante:
             raise EntityNotFoundError("Estudiante", data.estudiante_id)
+
+        if estudiante.estado != EstadoEstudiante.ACTIVO:
+            raise ValidationError(f"No se pueden crear alertas para estudiantes en estado {estudiante.estado.value}")
 
         nueva = Alerta(
             estudiante_id=estudiante.id,

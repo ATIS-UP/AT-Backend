@@ -4,11 +4,12 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
+from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.caso_especial import (
     RegistroCasoEspecial, HistorialRegistro,
     TipoRegistroCaso, EstadoRegistroCaso, AccionHistorial
 )
-from app.models.estudiante import Estudiante
+from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.schemas.caso_especial import (
     RegistroCasoCreate, RegistroCasoUpdate,
     RegistroCasoResponse, EstudianteInfo
@@ -100,7 +101,13 @@ class CasoEspecialService:
 
     def crear(self, data: RegistroCasoCreate, usuario_id: str, usuario_nombre: str) -> RegistroCasoResponse:
         tipo_enum = TipoRegistroCaso(data.tipo)
-        
+
+        estudiante = self.db.query(Estudiante).filter(Estudiante.id == data.estudiante_id).first()
+        if not estudiante:
+            raise EntityNotFoundError("Estudiante", data.estudiante_id)
+        if estudiante.estado != EstadoEstudiante.ACTIVO:
+            raise ValidationError(f"No se pueden crear registros de casos para estudiantes en estado {estudiante.estado.value}")
+
         nuevo_registro = RegistroCasoEspecial(
             estudiante_id=UUID(data.estudiante_id),
             tipo=tipo_enum,

@@ -7,7 +7,8 @@ from app.dependencies import require_permiso
 from app.models.user import User
 from app.schemas.estudiante import (
     EstudianteCreate, EstudianteUpdate, EstudianteResponse,
-    EstudianteListResponse, HistorialAcademico
+    EstudianteListResponse, EstudianteRelacionesConteo, EstudianteEstadoUpdate,
+    HistorialAcademico
 )
 from app.schemas.common import CargaMasivaResumen
 from app.services.estudiante_service import EstudianteService
@@ -97,6 +98,33 @@ async def get_historial(
     """get academic history for a student"""
     service = EstudianteService(db)
     return service.obtener_historial(estudiante_id)
+
+
+@router.get("/{estudiante_id}/relaciones-conteo", response_model=EstudianteRelacionesConteo)
+async def get_relaciones_conteo(
+    estudiante_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permiso("ver_estudiantes"))
+):
+    """get count of related records for a student (alerts, cases, enrollments, etc)"""
+    service = EstudianteService(db)
+    return service.obtener_conteo_relaciones(estudiante_id)
+
+
+@router.put("/{estudiante_id}/estado", response_model=EstudianteResponse)
+async def update_estudiante_estado(
+    estudiante_id: str,
+    estado_data: EstudianteEstadoUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permiso("editar_estudiante"))
+):
+    """change student estado (activate/inactivate)"""
+    service = EstudianteService(db)
+    return service.cambiar_estado(
+        estudiante_id, estado_data.estado, str(current_user.id), request.client.host
+    )
 
 
 @router.post("/carga-masiva", response_model=CargaMasivaResumen)

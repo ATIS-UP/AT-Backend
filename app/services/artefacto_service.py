@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.alerta import Artefacto
+from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.utils.audit import AuditService
 
 
@@ -140,6 +141,14 @@ class ArtefactoService:
             self._save_to_s3(file, relative_path)
         else:
             self._save_to_disk(file, relative_path)
+
+        # validate student is active if estudiante_id is provided
+        if estudiante_id:
+            est = self.db.query(Estudiante).filter(Estudiante.id == estudiante_id).first()
+            if not est:
+                raise EntityNotFoundError("Estudiante", estudiante_id)
+            if est.estado != EstadoEstudiante.ACTIVO:
+                raise ValidationError(f"No se pueden subir artefactos para estudiantes en estado {est.estado.value}")
 
         artefacto = Artefacto(
             nombre=file.filename,

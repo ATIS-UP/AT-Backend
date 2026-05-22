@@ -34,7 +34,7 @@ class Alerta(Base):
     __tablename__ = "alertas"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id"), nullable=False)
+    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id", ondelete="CASCADE"), nullable=False)
     materia_id = Column(UUID(as_uuid=True), ForeignKey("materias.id"), nullable=True)
     nivel_riesgo = Column(Enum(NivelRiesgo), nullable=False)
     estado_seguimiento = Column(Enum(EstadoSeguimiento), default=EstadoSeguimiento.PENDIENTE)
@@ -102,7 +102,7 @@ class RespuestaEncuesta(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     encuesta_id = Column(UUID(as_uuid=True), ForeignKey("encuestas.id"), nullable=False)
-    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id"), nullable=False)
+    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id", ondelete="CASCADE"), nullable=False)
     respuestas = Column(JSON, default=dict)  # {"pregunta_1": "respuesta", ...}
     fecha_respuesta = Column(DateTime, server_default=func.now())
     created_at = Column(DateTime, server_default=func.now())
@@ -117,7 +117,7 @@ class Artefacto(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     alerta_id = Column(UUID(as_uuid=True), ForeignKey("alertas.id"), nullable=True)
-    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id"), nullable=True)
+    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id", ondelete="CASCADE"), nullable=True)
     nombre = Column(String(255), nullable=False)
     tipo = Column(String(50), nullable=False)  # DOCUMENTO, IMAGEN, PDF, OTRO
     url = Column(String(500), nullable=False)

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.models.alerta import Alerta, NivelRiesgo, EstadoSeguimiento
-from app.models.estudiante import Inscripcion
+from app.models.estudiante import Estudiante, Inscripcion, EstadoEstudiante
 from app.models.sistema import Parametrizacion
 from app.utils.audit import AuditService
 from app.exceptions import ValidationError
@@ -32,9 +32,12 @@ class AlertaAutomaticaService:
         umbrales = self._obtener_umbrales()
 
         # get all inscripciones for the period that have at least one grade
+        # only for active students
         inscripciones = (
             self.db.query(Inscripcion)
+            .join(Estudiante, Inscripcion.estudiante_id == Estudiante.id)
             .filter(Inscripcion.periodo == periodo)
+            .filter(Estudiante.estado == EstadoEstudiante.ACTIVO)
             .all()
         )
 

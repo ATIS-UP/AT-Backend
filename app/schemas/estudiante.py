@@ -62,6 +62,18 @@ class EstudianteListResponse(BaseModel):
     estudiantes: List[EstudianteResponse]
 
 
+class EstudianteRelacionesConteo(BaseModel):
+    alertas: int = 0
+    casos: int = 0
+    inscripciones: int = 0
+    respuestas_encuestas: int = 0
+    artefactos: int = 0
+
+
+class EstudianteEstadoUpdate(BaseModel):
+    estado: str
+
+
 # Materia
 class MateriaBase(BaseModel):
     codigo: str

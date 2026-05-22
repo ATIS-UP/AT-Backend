@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.exceptions import EntityNotFoundError, ValidationError, DuplicateEntityError
 from app.models.alerta import Encuesta, RespuestaEncuesta
+from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.utils.audit import AuditService
 
 
@@ -180,13 +181,20 @@ class EncuestaService:
         self, encuesta_id: str, estudiante_id: str, respuestas: list
     ) -> dict:
         """save a student response to a published survey.
-        rejects if survey is not PUBLICADA or student already responded."""
+        rejects if survey is not PUBLICADA, student not ACTIVO, or already responded."""
         encuesta = self._get_or_raise(encuesta_id)
 
         if encuesta.estado != "PUBLICADA":
             raise ValidationError(
                 "Solo se pueden responder encuestas en estado PUBLICADA"
             )
+
+        # validate student exists and is active
+        estudiante = self.db.query(Estudiante).filter(Estudiante.id == estudiante_id).first()
+        if not estudiante:
+            raise EntityNotFoundError("Estudiante", estudiante_id)
+        if estudiante.estado != EstadoEstudiante.ACTIVO:
+            raise ValidationError(f"Los estudiantes en estado {estudiante.estado.value} no pueden responder encuestas")
 
         # check for duplicate response
         existing = (

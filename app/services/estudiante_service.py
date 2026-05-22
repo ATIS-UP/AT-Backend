@@ -2,17 +2,20 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from app.models.estudiante import Estudiante, Inscripcion
+from app.models.estudiante import Estudiante, Inscripcion, EstadoEstudiante
+from app.models.alerta import Alerta, RespuestaEncuesta, Artefacto
+from app.models.caso_especial import RegistroCasoEspecial
 from app.schemas.estudiante import (
     EstudianteCreate,
     EstudianteUpdate,
     EstudianteResponse,
+    EstudianteRelacionesConteo,
     HistorialAcademico,
     InscripcionResponse,
 )
 from app.utils.security import encrypt_data, decrypt_data, sanitize_like_param
 from app.utils.audit import AuditService
-from app.exceptions import EntityNotFoundError, DuplicateEntityError
+from app.exceptions import EntityNotFoundError, DuplicateEntityError, ValidationError
 
 
 class EstudianteService:
@@ -190,6 +193,49 @@ class EstudianteService:
             str(est.id),
             datos_anteriores,
             update_data,
+            ip,
+        )
+
+        return self._to_response(est)
+
+    def obtener_conteo_relaciones(self, estudiante_id: str) -> EstudianteRelacionesConteo:
+        """count all related records for a student (alerts, cases, enrollments, etc)"""
+        est_id = estudiante_id
+        return EstudianteRelacionesConteo(
+            alertas=self.db.query(Alerta).filter(Alerta.estudiante_id == est_id).count(),
+            casos=self.db.query(RegistroCasoEspecial).filter(RegistroCasoEspecial.estudiante_id == est_id).count(),
+            inscripciones=self.db.query(Inscripcion).filter(Inscripcion.estudiante_id == est_id).count(),
+            respuestas_encuestas=self.db.query(RespuestaEncuesta).filter(RespuestaEncuesta.estudiante_id == est_id).count(),
+            artefactos=self.db.query(Artefacto).filter(Artefacto.estudiante_id == est_id).count(),
+        )
+
+    def cambiar_estado(self, estudiante_id: str, nuevo_estado: str, usuario_id: str, ip: str) -> EstudianteResponse:
+        """change student estado (for inactivating/activating students)"""
+        est = (
+            self.db.query(Estudiante)
+            .filter(Estudiante.id == estudiante_id)
+            .first()
+        )
+        if not est:
+            raise EntityNotFoundError("Estudiante", estudiante_id)
+
+        estado_anterior = est.estado.value if hasattr(est.estado, 'value') else str(est.estado)
+
+        try:
+            est.estado = EstadoEstudiante(nuevo_estado)
+        except ValueError:
+            raise ValidationError(f"Estado inválido: {nuevo_estado}. Valores permitidos: {', '.join([e.value for e in EstadoEstudiante])}")
+
+        self.db.commit()
+        self.db.refresh(est)
+
+        AuditService.log_actualizar(
+            self.db,
+            usuario_id,
+            "Estudiante",
+            str(est.id),
+            {"estado": estado_anterior},
+            {"estado": nuevo_estado},
             ip,
         )
 

@@ -46,10 +46,10 @@ class Estudiante(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Relaciones
-    alertas = relationship("Alerta", back_populates="estudiante")
-    inscripciones = relationship("Inscripcion", back_populates="estudiante")
-    artefactos = relationship("Artefacto", back_populates="estudiante")
-    respuestas_encuestas = relationship("RespuestaEncuesta", back_populates="estudiante")
+    alertas = relationship("Alerta", back_populates="estudiante", passive_deletes=True)
+    inscripciones = relationship("Inscripcion", back_populates="estudiante", passive_deletes=True)
+    artefactos = relationship("Artefacto", back_populates="estudiante", passive_deletes=True)
+    respuestas_encuestas = relationship("RespuestaEncuesta", back_populates="estudiante", passive_deletes=True)
 
 
 class Materia(Base):
@@ -73,7 +73,7 @@ class Inscripcion(Base):
     __tablename__ = "inscripciones"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id"), nullable=False)
+    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id", ondelete="CASCADE"), nullable=False)
     materia_id = Column(UUID(as_uuid=True), ForeignKey("materias.id"), nullable=False)
     periodo = Column(String(20), nullable=False, index=True)  # ej: "2025-1"
     nota_final = Column(Numeric(5, 2), nullable=True)  # Encriptado

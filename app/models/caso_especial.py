@@ -34,7 +34,7 @@ class RegistroCasoEspecial(Base):
     __tablename__ = "registros_casos_especiales"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id"), nullable=False, index=True)
+    estudiante_id = Column(UUID(as_uuid=True), ForeignKey("estudiantes.id", ondelete="CASCADE"), nullable=False, index=True)
     tipo = Column(Enum(TipoRegistroCaso), nullable=False)
     estado = Column(Enum(EstadoRegistroCaso), default=EstadoRegistroCaso.ACTIVO)
     observaciones = Column(Text, nullable=True)
