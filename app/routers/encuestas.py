@@ -1,6 +1,8 @@
 """router for survey (encuesta) operations - thin layer delegating to service"""
 from fastapi import APIRouter, Depends, Request, Query, status
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_permiso
@@ -8,10 +10,62 @@ from app.models.user import User
 from app.schemas.encuesta import (
     EncuestaCreate, EncuestaUpdate, EncuestaResponse,
     EncuestaListResponse, RespuestaCreate, EncuestaResultados,
+    VerificarEstudianteRequest, VerificarEstudianteResponse,
+    ResponderEncuestaPublica, InfoPublicaResponse,
 )
 from app.services.encuesta_service import EncuestaService
 
 router = APIRouter(prefix="/api/encuestas", tags=["encuestas"])
+limiter = Limiter(key_func=get_remote_address)
+
+
+@router.get("/publicas")
+async def list_encuestas_publicas(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """list published surveys (no auth required, rate limited)"""
+    service = EncuestaService(db)
+    return {"encuestas": service.listar_publicas()}
+
+
+@router.get("/{encuesta_id}/info-publica", response_model=InfoPublicaResponse)
+@limiter.limit("30/minute")
+async def get_info_publica(
+    encuesta_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """get public survey info (no auth required). only for PUBLICADA surveys."""
+    service = EncuestaService(db)
+    return service.obtener_info_publica(encuesta_id)
+
+
+@router.post("/{encuesta_id}/verificar-estudiante", response_model=VerificarEstudianteResponse)
+@limiter.limit("10/minute")
+async def verificar_estudiante(
+    encuesta_id: str,
+    body: VerificarEstudianteRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """verify a student by documento before answering a survey (no auth required)"""
+    service = EncuestaService(db)
+    result = service.verificar_estudiante(encuesta_id, body.documento)
+    return VerificarEstudianteResponse(**result)
+
+
+@router.post("/{encuesta_id}/responder-publico", status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
+async def responder_publico(
+    encuesta_id: str,
+    body: ResponderEncuestaPublica,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """submit survey answers as a public student (no auth required)"""
+    service = EncuestaService(db)
+    return service.responder_publico(encuesta_id, body.documento, body.respuestas)
 
 
 @router.get("", response_model=EncuestaListResponse)

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.exceptions import EntityNotFoundError, ValidationError, DuplicateEntityError
 from app.models.alerta import Encuesta, RespuestaEncuesta
 from app.models.estudiante import Estudiante, EstadoEstudiante
+from app.utils.security import decrypt_data
 from app.utils.audit import AuditService
 
 
@@ -42,6 +43,10 @@ class EncuestaService:
     def crear(self, data: dict, usuario_id: str) -> dict:
         """create a new survey with questions stored as json."""
         preguntas = data.get("preguntas", [])
+        # auto-assign sequential ids to questions that arrive without one
+        for i, p in enumerate(preguntas):
+            if p.get("id") is None:
+                p["id"] = i + 1
         self._validar_preguntas(preguntas)
 
         encuesta = Encuesta(
@@ -83,8 +88,12 @@ class EncuestaService:
         if "descripcion" in data:
             encuesta.descripcion = data["descripcion"]
         if "preguntas" in data:
-            self._validar_preguntas(data["preguntas"])
-            encuesta.preguntas = data["preguntas"]
+            preguntas = data["preguntas"]
+            for i, p in enumerate(preguntas):
+                if p.get("id") is None:
+                    p["id"] = i + 1
+            self._validar_preguntas(preguntas)
+            encuesta.preguntas = preguntas
         if "periodo" in data:
             encuesta.periodo = data["periodo"]
 
@@ -314,6 +323,106 @@ class EncuestaService:
             "total_respuestas": len(respuestas),
             "resultados_por_pregunta": resultados_por_pregunta,
         }
+
+    def listar_publicas(self) -> list[dict]:
+        """list surveys in PUBLICADA state (no auth required)."""
+        encuestas = (
+            self.db.query(Encuesta)
+            .filter(Encuesta.estado == "PUBLICADA")
+            .order_by(Encuesta.created_at.desc())
+            .all()
+        )
+        return [self._to_dict(e) for e in encuestas]
+
+    def obtener_info_publica(self, encuesta_id: str) -> dict:
+        """get public survey info (no auth required). only for PUBLICADA surveys."""
+        encuesta = self._get_or_raise(encuesta_id)
+        if encuesta.estado != "PUBLICADA":
+            raise ValidationError("La encuesta no esta disponible")
+        return {
+            "id": str(encuesta.id),
+            "titulo": encuesta.titulo,
+            "descripcion": encuesta.descripcion,
+            "preguntas": encuesta.preguntas or [],
+        }
+
+    def verificar_estudiante(
+        self, encuesta_id: str, documento: str
+    ) -> dict:
+        """verify a student by documento and check if they can answer the survey.
+        documento is encrypted, so we decrypt and compare in Python."""
+        encuesta = self._get_or_raise(encuesta_id)
+
+        if encuesta.estado != "PUBLICADA":
+            raise ValidationError("La encuesta no esta disponible para responder")
+
+        # find student by decrypted documento
+        estudiante = None
+        all_students = self.db.query(Estudiante).all()
+        for est in all_students:
+            if not est.documento:
+                continue
+            decrypted = decrypt_data(est.documento)
+            if decrypted == documento:
+                estudiante = est
+                break
+
+        if not estudiante:
+            return {
+                "existe": False,
+                "ya_respondio": False,
+                "puede_responder": False,
+                "estudiante_nombre": None,
+                "estudiante_id": None,
+            }
+
+        nombres = decrypt_data(estudiante.nombres)
+        apellidos = decrypt_data(estudiante.apellidos)
+        estudiante_nombre = f"{nombres} {apellidos}".strip()
+
+        if estudiante.estado != EstadoEstudiante.ACTIVO:
+            return {
+                "existe": True,
+                "ya_respondio": False,
+                "puede_responder": False,
+                "estudiante_nombre": estudiante_nombre,
+                "estudiante_id": str(estudiante.id),
+            }
+
+        # check for existing response
+        existing = (
+            self.db.query(RespuestaEncuesta)
+            .filter(
+                RespuestaEncuesta.encuesta_id == encuesta.id,
+                RespuestaEncuesta.estudiante_id == estudiante.id,
+            )
+            .first()
+        )
+
+        return {
+            "existe": True,
+            "ya_respondio": existing is not None,
+            "puede_responder": existing is None and estudiante.estado == EstadoEstudiante.ACTIVO,
+            "estudiante_nombre": estudiante_nombre,
+            "estudiante_id": str(estudiante.id),
+        }
+
+    def responder_publico(
+        self, encuesta_id: str, documento: str, respuestas: list
+    ) -> dict:
+        """submit survey answers as a public student (no auth token needed).
+        verifies documento matches a registered student."""
+        verificado = self.verificar_estudiante(encuesta_id, documento)
+        if not verificado["puede_responder"]:
+            if not verificado["existe"]:
+                raise ValidationError("Documento no registrado en el sistema")
+            if verificado["ya_respondio"]:
+                raise ValidationError("Ya has respondido esta encuesta")
+            raise ValidationError("No puedes responder esta encuesta")
+
+        estudiante_id = verificado["estudiante_id"]
+        # reuse existing registration logic
+        return self.registrar_respuesta(encuesta_id, estudiante_id, respuestas)
 
     # -- private helpers --
 

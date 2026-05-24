@@ -16,6 +16,7 @@ from app.schemas.estudiante import (
 from app.utils.security import encrypt_data, decrypt_data, sanitize_like_param
 from app.utils.audit import AuditService
 from app.exceptions import EntityNotFoundError, DuplicateEntityError, ValidationError
+from itertools import chain
 
 
 class EstudianteService:
@@ -59,26 +60,45 @@ class EstudianteService:
         estado: Optional[str] = None,
         programa: Optional[str] = None,
     ) -> tuple[list[EstudianteResponse], int]:
-        """query students with filters, decrypt data, return results and total"""
+        """query students with filters, decrypt data, return results and total.
+        Note: nombres/apellidos are encrypted, so ilike cannot match them at DB level.
+        For name searches, we decrypt and filter in Python."""
         query = self.db.query(Estudiante)
 
-        if buscar:
-            safe_buscar = sanitize_like_param(buscar)
-            query = query.filter(
-                (Estudiante.codigo.ilike(f"%{safe_buscar}%"))
-                | (Estudiante.nombres.ilike(f"%{safe_buscar}%"))
-                | (Estudiante.apellidos.ilike(f"%{safe_buscar}%"))
-            )
         if estado:
             query = query.filter(Estudiante.estado == estado)
         if programa:
             safe_programa = sanitize_like_param(programa)
             query = query.filter(Estudiante.programa.ilike(f"%{safe_programa}%"))
 
+        if buscar:
+            safe_buscar = sanitize_like_param(buscar)
+            # codigo is unencrypted — ilike works at DB level
+            codigo_filter = Estudiante.codigo.ilike(f"%{safe_buscar}%")
+
+            # gather ids matching by codigo
+            codigo_ids = {est.id for est in query.filter(codigo_filter).all()}
+
+            # decrypt and filter by name for remaining students
+            all_ests = query.all()
+            for est in all_ests:
+                if est.id in codigo_ids:
+                    continue
+                nombres = decrypt_data(est.nombres)
+                apellidos = decrypt_data(est.apellidos)
+                if safe_buscar.lower() in (nombres or '').lower() or safe_buscar.lower() in (apellidos or '').lower():
+                    codigo_ids.add(est.id)
+
+            if codigo_ids:
+                query = query.filter(Estudiante.id.in_(list(codigo_ids)))
+            else:
+                # no matches — return empty
+                return [], 0
+
         total = query.count()
 
         estudiantes = (
-            query.order_by(Estudiante.apellidos)
+            query.order_by(Estudiante.codigo)
             .offset((pagina - 1) * por_pagina)
             .limit(por_pagina)
             .all()
@@ -96,6 +116,17 @@ class EstudianteService:
         )
         if not est:
             raise EntityNotFoundError("Estudiante", estudiante_id)
+        return self._to_response(est)
+
+    def buscar_por_codigo(self, codigo: str) -> Optional[EstudianteResponse]:
+        """look up a student by their codigo (unencrypted). returns None if not found."""
+        est = (
+            self.db.query(Estudiante)
+            .filter(Estudiante.codigo == codigo)
+            .first()
+        )
+        if not est:
+            return None
         return self._to_response(est)
 
     def crear(

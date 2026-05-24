@@ -29,9 +29,20 @@ class AlertaService:
 
     def _to_response(self, alerta: Alerta) -> AlertaResponse:
         """convert an alerta orm instance to response schema"""
+        estudiante_nombre = None
+        try:
+            est = self.db.query(Estudiante).filter(Estudiante.id == alerta.estudiante_id).first()
+            if est:
+                nombres = decrypt_data(est.nombres)
+                apellidos = decrypt_data(est.apellidos)
+                estudiante_nombre = f"{nombres} {apellidos}".strip()
+        except Exception:
+            pass
+
         return AlertaResponse(
             id=str(alerta.id),
             estudiante_id=str(alerta.estudiante_id),
+            estudiante_nombre=estudiante_nombre,
             materia_id=str(alerta.materia_id) if alerta.materia_id else None,
             nivel_riesgo=alerta.nivel_riesgo.value,
             estado_seguimiento=alerta.estado_seguimiento.value,

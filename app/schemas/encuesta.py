@@ -1,10 +1,10 @@
 """schemas for survey (encuesta) endpoints"""
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PreguntaEncuesta(BaseModel):
-    id: int
+    id: Optional[int] = None
     texto: str
     tipo: str  # opcion_multiple, texto_libre, escala_likert, ABIERTA
     opciones: Optional[list[str]] = None
@@ -65,3 +65,27 @@ class EncuestaResultados(BaseModel):
     titulo: str
     total_respuestas: int
     resultados_por_pregunta: list[ResultadoPregunta]
+
+
+class InfoPublicaResponse(BaseModel):
+    id: str
+    titulo: str
+    descripcion: Optional[str] = None
+    preguntas: list[dict] = []
+
+
+class VerificarEstudianteRequest(BaseModel):
+    documento: str = Field(..., min_length=1, max_length=50)
+
+
+class VerificarEstudianteResponse(BaseModel):
+    existe: bool
+    ya_respondio: bool = False
+    puede_responder: bool = False
+    estudiante_nombre: Optional[str] = None
+    estudiante_id: Optional[str] = None
+
+
+class ResponderEncuestaPublica(BaseModel):
+    documento: str = Field(..., min_length=1, max_length=50)
+    respuestas: list[dict]

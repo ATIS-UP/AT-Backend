@@ -33,6 +33,7 @@ class AlertaEstadoUpdate(BaseModel):
 class AlertaResponse(BaseModel):
     id: str
     estudiante_id: str
+    estudiante_nombre: Optional[str] = None
     materia_id: Optional[str]
     nivel_riesgo: str
     estado_seguimiento: str
