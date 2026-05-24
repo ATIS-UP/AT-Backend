@@ -43,13 +43,14 @@ async def buscar_estudiante(
     q: str = Query(..., min_length=1, description="Texto de búsqueda"),
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(20, ge=1, le=100),
+    tipo: Optional[str] = Query(None, description="Filtrar por tipo de caso"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permiso("ver_registros_casos"))
 ):
     """Buscar estudiantes por documento, nombre, apellido o código"""
     service = get_service(db)
-    resultados, total = service.buscar_estudiantes(q, pagina, por_pagina)
+    resultados, total = service.buscar_estudiantes(q, pagina, por_pagina, tipo)
     return {
         "resultados": resultados,
         "total": total,
@@ -73,7 +74,7 @@ async def crear_registro(
 @router.get("", response_model=RegistroCasoListResponse)
 async def listar_registros(
     pagina: int = Query(1, ge=1),
-    por_pagina: int = Query(20, ge=1, le=100),
+    por_pagina: int = Query(20, ge=1, le=500),
     estado: Optional[str] = Query(None),
     tipo: Optional[str] = Query(None),
     request: Request = None,

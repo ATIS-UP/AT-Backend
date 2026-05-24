@@ -10,9 +10,10 @@ from app.models.caso_especial import (
     TipoRegistroCaso, EstadoRegistroCaso, AccionHistorial
 )
 from app.models.estudiante import Estudiante, EstadoEstudiante
+from app.models.novedad_caso import NovedadCaso
 from app.schemas.caso_especial import (
     RegistroCasoCreate, RegistroCasoUpdate,
-    RegistroCasoResponse, EstudianteInfo
+    RegistroCasoResponse, EstudianteInfo, NovedadInfo
 )
 from app.utils.security import decrypt_data
 
@@ -34,6 +35,9 @@ class CasoEspecialService:
         )
 
     def _registro_to_response(self, registro: RegistroCasoEspecial) -> RegistroCasoResponse:
+        novedad_info = None
+        if registro.novedad:
+            novedad_info = NovedadInfo(id=str(registro.novedad.id), nombre=registro.novedad.nombre)
         return RegistroCasoResponse(
             id=str(registro.id),
             estudiante_id=str(registro.estudiante_id),
@@ -41,19 +45,20 @@ class CasoEspecialService:
             tipo=registro.tipo.value if hasattr(registro.tipo, 'value') else str(registro.tipo),
             estado=registro.estado.value if hasattr(registro.estado, 'value') else str(registro.estado),
             observaciones=registro.observaciones,
+            novedad_id=str(registro.novedad_id) if registro.novedad_id else None,
+            novedad=novedad_info,
             responsable_id=str(registro.responsable_id),
             responsable_nombre=registro.responsable_nombre,
             created_at=registro.created_at,
             updated_at=registro.updated_at
         )
 
-    def buscar_estudiantes(self, q: str, pagina: int = 1, por_pagina: int = 20) -> Tuple[List, int]:
+    def buscar_estudiantes(self, q: str, pagina: int = 1, por_pagina: int = 20, tipo: Optional[str] = None) -> Tuple[List, int]:
         if not q:
             return [], 0
         
         q_lower = q.lower().strip()
         
-        # Obtener todos los estudiantes y filtrar en Python después de desencriptar
         estudiantes = self.db.query(Estudiante).all()
         
         estudiantes = [
@@ -64,9 +69,12 @@ class CasoEspecialService:
         estudiante_ids = [est.id for est in estudiantes]
         registros_dict = {}
         if estudiante_ids:
-            registros = self.db.query(RegistroCasoEspecial).filter(
+            query = self.db.query(RegistroCasoEspecial).filter(
                 RegistroCasoEspecial.estudiante_id.in_(estudiante_ids)
-            ).order_by(RegistroCasoEspecial.created_at.desc()).all()
+            )
+            if tipo:
+                query = query.filter(RegistroCasoEspecial.tipo == TipoRegistroCaso(tipo))
+            registros = query.order_by(RegistroCasoEspecial.created_at.desc()).all()
             for reg in registros:
                 eid = str(reg.estudiante_id)
                 if eid not in registros_dict:
@@ -108,11 +116,21 @@ class CasoEspecialService:
         if estudiante.estado != EstadoEstudiante.ACTIVO:
             raise ValidationError(f"No se pueden crear registros de casos para estudiantes en estado {estudiante.estado.value}")
 
+        if not data.novedad_id:
+            raise ValidationError("Debe seleccionar una novedad para el caso")
+
+        novedad = self.db.query(NovedadCaso).filter(NovedadCaso.id == UUID(data.novedad_id)).first()
+        if not novedad:
+            raise EntityNotFoundError("Novedad", data.novedad_id)
+        if novedad.tipo_caso != data.tipo:
+            raise ValidationError("La novedad seleccionada no corresponde al tipo de caso")
+
         nuevo_registro = RegistroCasoEspecial(
             estudiante_id=UUID(data.estudiante_id),
             tipo=tipo_enum,
             estado=EstadoRegistroCaso.ACTIVO,
             observaciones=data.observaciones,
+            novedad_id=UUID(data.novedad_id),
             responsable_id=UUID(usuario_id),
             responsable_nombre=usuario_nombre
         )
@@ -157,6 +175,11 @@ class CasoEspecialService:
             registro.tipo = TipoRegistroCaso(data.tipo)
         if data.estado:
             registro.estado = EstadoRegistroCaso(data.estado)
+        if data.novedad_id is not None:
+            novedad = self.db.query(NovedadCaso).filter(NovedadCaso.id == UUID(data.novedad_id)).first()
+            if not novedad:
+                raise EntityNotFoundError("Novedad", data.novedad_id)
+            registro.novedad_id = UUID(data.novedad_id)
         if data.observaciones is not None:
             registro.observaciones = data.observaciones
         

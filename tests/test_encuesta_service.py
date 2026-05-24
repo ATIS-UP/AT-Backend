@@ -204,14 +204,17 @@ class TestEncuestaServiceRegistrarRespuesta:
         encuesta = _make_encuesta(estado="PUBLICADA")
         estudiante_id = str(uuid.uuid4())
 
-        # first query returns encuesta, second returns no existing response
-        query_mock = MagicMock()
-        filter_mock = MagicMock()
+        # first query returns encuesta, second returns estudiante, third returns no existing response
+        query_call_count = [0]
 
         def query_side_effect(model):
+            query_call_count[0] += 1
             mock = MagicMock()
             if model.__tablename__ == "encuestas":
                 mock.filter.return_value.first.return_value = encuesta
+            elif model.__tablename__ == "estudiantes":
+                mock.filter.return_value.first.return_value = MagicMock()
+                mock.filter.return_value.first.return_value.estado = "ACTIVO"
             else:
                 mock.filter.return_value.first.return_value = None
             return mock
@@ -254,6 +257,9 @@ class TestEncuestaServiceRegistrarRespuesta:
             mock = MagicMock()
             if model.__tablename__ == "encuestas":
                 mock.filter.return_value.first.return_value = encuesta
+            elif model.__tablename__ == "estudiantes":
+                mock.filter.return_value.first.return_value = MagicMock()
+                mock.filter.return_value.first.return_value.estado = "ACTIVO"
             else:
                 mock.filter.return_value.first.return_value = existing_resp
             return mock

@@ -1,6 +1,6 @@
 """Modelos de Registros de Casos Especiales"""
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, Enum, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, DateTime, Enum, ForeignKey, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -14,6 +14,8 @@ class TipoRegistroCaso(str, enum.Enum):
     ARTICULADO = "ARTICULADO"
     RENDIMIENTO_ACADEMICO = "RENDIMIENTO_ACADEMICO"
     CONDUCTUAL = "CONDUCTUAL"
+    PSICOSOCIAL = "PSICOSOCIAL"
+    INSTITUCIONAL_VOCACIONAL = "INSTITUCIONAL_VOCACIONAL"
     OTRO = "OTRO"
 
 
@@ -38,6 +40,7 @@ class RegistroCasoEspecial(Base):
     tipo = Column(Enum(TipoRegistroCaso), nullable=False)
     estado = Column(Enum(EstadoRegistroCaso), default=EstadoRegistroCaso.ACTIVO)
     observaciones = Column(Text, nullable=True)
+    novedad_id = Column(UUID(as_uuid=True), ForeignKey("novedades_casos.id"), nullable=True)
     responsable_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     responsable_nombre = Column(String(255), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
@@ -45,6 +48,7 @@ class RegistroCasoEspecial(Base):
 
     estudiante = relationship("Estudiante", foreign_keys=[estudiante_id])
     responsable = relationship("User", foreign_keys=[responsable_id])
+    novedad = relationship("NovedadCaso", foreign_keys=[novedad_id])
     historiales = relationship("HistorialRegistro", back_populates="registro", cascade="all, delete-orphan")
 
 

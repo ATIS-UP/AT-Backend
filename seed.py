@@ -281,6 +281,49 @@ def seed_estudiantes_dummy(conn):
     print("  - 5 estudiantes creados/verificados")
 
 
+NOVEDADES_POR_TIPO = {
+    "RENDIMIENTO_ACADEMICO": [
+        "Bajo rendimiento acumulado",
+        "Pérdida recurrente de asignaturas",
+        "Inasistencia injustificada",
+        "Falta de competencias básicas",
+        "Otra",
+    ],
+    "PSICOSOCIAL": [
+        "Crisis emocionales o ansiedad",
+        "Problemas familiares",
+        "Consumo de sustancias",
+        "Dificultades de adaptación",
+    ],
+    "SOCIO_ECONOMICO": [
+        "Inestabilidad financiera",
+        "Inseguridad alimentaria",
+        "Carga laboral excesiva",
+    ],
+    "INSTITUCIONAL_VOCACIONAL": [
+        "Inconformidad con la carrera",
+        "Desconocimiento de servicios",
+    ],
+}
+
+
+def seed_novedades(conn):
+    """Crea novedades iniciales para cada tipo de caso"""
+    print("Creando novedades de casos especiales...")
+    total = 0
+    for tipo_caso, novedades in NOVEDADES_POR_TIPO.items():
+        for idx, nombre in enumerate(novedades, 1):
+            conn.execute(text("""
+                INSERT INTO novedades_casos (id, tipo_caso, nombre, activo, orden)
+                SELECT gen_random_uuid(), :tipo_caso, :nombre, true, :orden
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM novedades_casos WHERE tipo_caso = :tipo_caso AND nombre = :nombre
+                )
+            """), {"tipo_caso": tipo_caso, "nombre": nombre, "orden": idx})
+            total += 1
+    print(f"  - {total} novedades creadas/verificadas")
+
+
 def main():
     """Función principal del seed"""
     print("\n=== INICIALIZANDO BASE DE DATOS ===\n")
@@ -290,6 +333,7 @@ def main():
         seed_permisos(conn)
         seed_usuarios(conn)
         seed_parametrizacion(conn)
+        seed_novedades(conn)
         seed_estudiantes_dummy(conn)
 
         # Commit

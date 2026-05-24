@@ -21,13 +21,23 @@ class EstudianteInfo(BaseModel):
 class RegistroCasoCreate(BaseModel):
     estudiante_id: str
     tipo: str
+    novedad_id: str
     observaciones: Optional[str] = None
 
 
 class RegistroCasoUpdate(BaseModel):
     tipo: Optional[str] = None
     estado: Optional[str] = None
+    novedad_id: Optional[str] = None
     observaciones: Optional[str] = None
+
+
+class NovedadInfo(BaseModel):
+    id: str
+    nombre: str
+
+    class Config:
+        from_attributes = True
 
 
 class RegistroCasoResponse(BaseModel):
@@ -36,6 +46,8 @@ class RegistroCasoResponse(BaseModel):
     estudiante: EstudianteInfo
     tipo: str
     estado: str
+    novedad_id: Optional[str] = None
+    novedad: Optional[NovedadInfo] = None
     observaciones: Optional[str] = None
     responsable_id: str
     responsable_nombre: str
