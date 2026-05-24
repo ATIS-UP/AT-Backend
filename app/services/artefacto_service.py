@@ -183,7 +183,7 @@ class ArtefactoService:
         }
 
     def listar(
-        self, alerta_id: str = None, estudiante_id: str = None
+        self, alerta_id: str = None, estudiante_id: str = None, tipo: str = None
     ) -> list[dict]:
         query = self.db.query(Artefacto)
 
@@ -191,6 +191,8 @@ class ArtefactoService:
             query = query.filter(Artefacto.alerta_id == alerta_id)
         if estudiante_id:
             query = query.filter(Artefacto.estudiante_id == estudiante_id)
+        if tipo:
+            query = query.filter(Artefacto.tipo == tipo)
 
         query = query.order_by(Artefacto.created_at.desc())
         artefactos = query.all()

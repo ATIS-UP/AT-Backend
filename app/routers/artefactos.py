@@ -37,12 +37,13 @@ async def list_artefactos(
     request: Request,
     alerta_id: str = Query(None),
     estudiante_id: str = Query(None),
+    tipo: str = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """list artifacts filtered by alerta_id or estudiante_id"""
+    """list artifacts filtered by alerta_id, estudiante_id, or tipo"""
     service = ArtefactoService(db)
-    artefactos = service.listar(alerta_id=alerta_id, estudiante_id=estudiante_id)
+    artefactos = service.listar(alerta_id=alerta_id, estudiante_id=estudiante_id, tipo=tipo)
     return ArtefactoListResponse(artefactos=artefactos)
 
 
