@@ -8,6 +8,7 @@ from app.dependencies import require_permiso
 from app.models.user import User
 from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.models.alerta import Alerta, NivelRiesgo, EstadoSeguimiento
+from app.utils.security import decrypt_data
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -101,19 +102,26 @@ async def get_recientes(
     current_user: User = Depends(require_permiso("ver_dashboard")),
     limite: int = Query(10, ge=1, le=50)
 ):
-    """get recent alerts"""
+    """get recent alerts with student names"""
     alertas = db.query(Alerta).order_by(Alerta.created_at.desc()).limit(limite).all()
 
-    return {
-        "alertas_recientes": [
-            {
-                "id": str(a.id),
-                "estudiante_id": str(a.estudiante_id),
-                "nivel_riesgo": a.nivel_riesgo.value,
-                "estado_seguimiento": a.estado_seguimiento.value,
-                "periodo": a.periodo,
-                "created_at": a.created_at.isoformat()
-            }
-            for a in alertas
-        ]
-    }
+    resultados = []
+    for a in alertas:
+        estudiante_nombre = None
+        est = db.query(Estudiante).filter(Estudiante.id == a.estudiante_id).first()
+        if est:
+            nombres = decrypt_data(est.nombres)
+            apellidos = decrypt_data(est.apellidos)
+            estudiante_nombre = f"{nombres} {apellidos}".strip()
+
+        resultados.append({
+            "id": str(a.id),
+            "estudiante_id": str(a.estudiante_id),
+            "estudiante_nombre": estudiante_nombre,
+            "nivel_riesgo": a.nivel_riesgo.value,
+            "estado_seguimiento": a.estado_seguimiento.value,
+            "periodo": a.periodo,
+            "created_at": a.created_at.isoformat(),
+        })
+
+    return {"alertas_recientes": resultados}
