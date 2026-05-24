@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class PreguntaEncuesta(BaseModel):
     id: int
     texto: str
-    tipo: str  # opcion_multiple, texto_libre, escala_likert
+    tipo: str  # opcion_multiple, texto_libre, escala_likert, ABIERTA
     opciones: Optional[list[str]] = None
     requerida: bool = True
 

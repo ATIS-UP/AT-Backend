@@ -170,7 +170,13 @@ class CasoEspecialService:
             return None
         
         old_estado = registro.estado.value if hasattr(registro.estado, 'value') else str(registro.estado)
-        
+
+        if data.estado:
+            if data.estado == old_estado:
+                raise ValidationError(
+                    f"El registro ya se encuentra en estado {old_estado}"
+                )
+
         if data.tipo:
             registro.tipo = TipoRegistroCaso(data.tipo)
         if data.estado:

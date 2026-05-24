@@ -330,7 +330,7 @@ class EncuestaService:
 
     def _validar_preguntas(self, preguntas: list) -> None:
         """validate question structure and types."""
-        tipos_validos = {"opcion_multiple", "texto_libre", "escala_likert"}
+        tipos_validos = {"opcion_multiple", "texto_libre", "escala_likert", "ABIERTA"}
 
         for i, pregunta in enumerate(preguntas):
             if not isinstance(pregunta, dict):
