@@ -1,6 +1,6 @@
 """Modelos de Estudiantes, Materias e Inscripciones"""
 import uuid
-from sqlalchemy import Column, String, Integer, Numeric, DateTime, Enum, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Numeric, DateTime, Date, Enum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -37,6 +37,7 @@ class Estudiante(Base):
     telefono = Column(String(20), nullable=True)  # Encriptado
 
     # Datos no encriptados
+    fecha_nacimiento = Column(Date, nullable=True)
     programa = Column(String(255), nullable=False)
     semestre = Column(Integer, default=1)
     promedio_general = Column(Numeric(4, 2), nullable=True)  # Encriptado

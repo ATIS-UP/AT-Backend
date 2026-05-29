@@ -1,7 +1,7 @@
 """Schemas de estudiantes"""
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 
 
 class EstudianteBase(BaseModel):
@@ -11,6 +11,7 @@ class EstudianteBase(BaseModel):
     email: Optional[str] = None
     documento: Optional[str] = None
     telefono: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
     programa: str
     semestre: int = 1
     promedio_general: Optional[float] = None
@@ -28,6 +29,7 @@ class EstudianteUpdate(BaseModel):
     email: Optional[str] = None
     documento: Optional[str] = None
     telefono: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
     programa: Optional[str] = None
     semestre: Optional[int] = None
     promedio_general: Optional[float] = None
@@ -43,6 +45,7 @@ class EstudianteResponse(BaseModel):
     email: Optional[str]
     documento: Optional[str]
     telefono: Optional[str]
+    fecha_nacimiento: Optional[date] = None
     programa: str
     semestre: int
     promedio_general: Optional[float]

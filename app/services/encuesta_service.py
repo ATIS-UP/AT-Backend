@@ -1,6 +1,6 @@
 """service layer for survey (encuesta) management."""
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -347,20 +347,22 @@ class EncuestaService:
         }
 
     def verificar_estudiante(
-        self, encuesta_id: str, documento: str
+        self, encuesta_id: str, documento: str, fecha_nacimiento: date
     ) -> dict:
-        """verify a student by documento and check if they can answer the survey.
+        """verify a student by documento + fecha_nacimiento and check if they can answer.
         documento is encrypted, so we decrypt and compare in Python."""
         encuesta = self._get_or_raise(encuesta_id)
 
         if encuesta.estado != "PUBLICADA":
             raise ValidationError("La encuesta no esta disponible para responder")
 
-        # find student by decrypted documento
+        # find student by decrypted documento + fecha_nacimiento
         estudiante = None
         all_students = self.db.query(Estudiante).all()
         for est in all_students:
-            if not est.documento:
+            if not est.documento or not est.fecha_nacimiento:
+                continue
+            if est.fecha_nacimiento != fecha_nacimiento:
                 continue
             decrypted = decrypt_data(est.documento)
             if decrypted == documento:
@@ -408,14 +410,14 @@ class EncuestaService:
         }
 
     def responder_publico(
-        self, encuesta_id: str, documento: str, respuestas: list
+        self, encuesta_id: str, documento: str, fecha_nacimiento: date, respuestas: list
     ) -> dict:
         """submit survey answers as a public student (no auth token needed).
-        verifies documento matches a registered student."""
-        verificado = self.verificar_estudiante(encuesta_id, documento)
+        verifies documento + fecha_nacimiento matches a registered student."""
+        verificado = self.verificar_estudiante(encuesta_id, documento, fecha_nacimiento)
         if not verificado["puede_responder"]:
             if not verificado["existe"]:
-                raise ValidationError("Documento no registrado en el sistema")
+                raise ValidationError("Documento y/o fecha de nacimiento no coinciden con el sistema")
             if verificado["ya_respondio"]:
                 raise ValidationError("Ya has respondido esta encuesta")
             raise ValidationError("No puedes responder esta encuesta")

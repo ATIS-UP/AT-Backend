@@ -35,6 +35,7 @@ class EstudianteService:
             email=decrypt_data(est.email) if est.email else None,
             documento=decrypt_data(est.documento) if est.documento else None,
             telefono=decrypt_data(est.telefono) if est.telefono else None,
+            fecha_nacimiento=est.fecha_nacimiento,
             programa=est.programa,
             semestre=est.semestre,
             promedio_general=(
@@ -148,6 +149,7 @@ class EstudianteService:
             email=encrypt_data(data.email) if data.email else None,
             documento=encrypt_data(data.documento) if data.documento else None,
             telefono=encrypt_data(data.telefono) if data.telefono else None,
+            fecha_nacimiento=data.fecha_nacimiento,
             programa=data.programa,
             semestre=data.semestre,
             promedio_general=(
