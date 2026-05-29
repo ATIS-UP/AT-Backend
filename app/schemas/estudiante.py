@@ -20,7 +20,7 @@ class EstudianteBase(BaseModel):
 
 
 class EstudianteCreate(EstudianteBase):
-    pass
+    fecha_nacimiento: date
 
 
 class EstudianteUpdate(BaseModel):

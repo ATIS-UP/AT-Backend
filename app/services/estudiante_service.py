@@ -1,4 +1,5 @@
 """service layer for student operations"""
+from datetime import date, datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -207,6 +208,14 @@ class EstudianteService:
         encrypted_numeric_fields = {"promedio_general", "promedio_acumulado"}
 
         update_data = data.model_dump(exclude_unset=True)
+        # Sanitize non-serializable types before audit log
+        audit_data = {}
+        for k, v in update_data.items():
+            if isinstance(v, (date, datetime)):
+                audit_data[k] = v.isoformat()
+            else:
+                audit_data[k] = v
+
         for key, value in update_data.items():
             if value is not None:
                 if key in encrypted_text_fields:
@@ -225,7 +234,7 @@ class EstudianteService:
             "Estudiante",
             str(est.id),
             datos_anteriores,
-            update_data,
+            audit_data,
             ip,
         )
 
