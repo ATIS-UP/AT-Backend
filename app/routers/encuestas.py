@@ -49,9 +49,9 @@ async def verificar_estudiante(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """verify a student by documento + fecha_nacimiento before answering a survey (no auth required)"""
+    """verify a student by documento before answering a survey (no auth required)"""
     service = EncuestaService(db)
-    result = service.verificar_estudiante(encuesta_id, body.documento, body.fecha_nacimiento)
+    result = service.verificar_estudiante(encuesta_id, body.documento)
     return VerificarEstudianteResponse(**result)
 
 
@@ -65,7 +65,7 @@ async def responder_publico(
 ):
     """submit survey answers as a public student (no auth required)"""
     service = EncuestaService(db)
-    return service.responder_publico(encuesta_id, body.documento, body.fecha_nacimiento, body.respuestas)
+    return service.responder_publico(encuesta_id, body.documento, body.respuestas)
 
 
 @router.get("", response_model=EncuestaListResponse)

@@ -140,7 +140,6 @@ def seed_estudiantes_dummy(conn):
             "nombres": "Carlos",
             "apellidos": "Mendoza Torres",
             "documento": "1098765432",
-            "fecha_nacimiento": "2002-05-15",
             "email": "carlos.mendoza@unipamplona.edu.co",
             "telefono": "3001234567",
             "programa": "Ingeniería de Sistemas",
@@ -153,7 +152,6 @@ def seed_estudiantes_dummy(conn):
             "nombres": "María Fernanda",
             "apellidos": "López Rincón",
             "documento": "1098765433",
-            "fecha_nacimiento": "2003-08-22",
             "email": "maria.lopez@unipamplona.edu.co",
             "telefono": "3002345678",
             "programa": "Medicina",
@@ -168,7 +166,6 @@ def seed_estudiantes_dummy(conn):
             "nombres": "Juan Andrés",
             "apellidos": "Pérez Gómez",
             "documento": "1098765434",
-            "fecha_nacimiento": "2004-01-10",
             "email": "juan.perez@unipamplona.edu.co",
             "telefono": "3003456789",
             "programa": "Ingeniería Civil",
@@ -184,7 +181,6 @@ def seed_estudiantes_dummy(conn):
             "nombres": "Ana Sofía",
             "apellidos": "Ramírez Hernández",
             "documento": "1098765435",
-            "fecha_nacimiento": "2005-11-03",
             "email": "ana.ramirez@unipamplona.edu.co",
             "telefono": "3004567890",
             "programa": "Derecho",
@@ -200,7 +196,6 @@ def seed_estudiantes_dummy(conn):
             "nombres": "Pedro Luis",
             "apellidos": "García Sánchez",
             "documento": "1098765436",
-            "fecha_nacimiento": "2006-07-19",
             "email": "pedro.garcia@unipamplona.edu.co",
             "telefono": "3005678901",
             "programa": "Ingeniería de Sistemas",
@@ -220,15 +215,14 @@ def seed_estudiantes_dummy(conn):
             "documento": encrypt_data(est["documento"]),
             "email": encrypt_data(est["email"]) if est.get("email") else None,
             "telefono": encrypt_data(est["telefono"]) if est.get("telefono") else None,
-            "fecha_nacimiento": est.get("fecha_nacimiento"),
             "programa": est["programa"],
             "semestre": est["semestre"],
             "estado": est["estado"]
         }
         
         result = conn.execute(text("""
-            INSERT INTO estudiantes (id, codigo, nombres, apellidos, documento, email, telefono, fecha_nacimiento, programa, semestre, estado)
-            SELECT gen_random_uuid(), :codigo, :nombres, :apellidos, :documento, :email, :telefono, CAST(:fecha_nacimiento AS date), :programa, :semestre, CAST(:estado AS estadoestudiante)
+            INSERT INTO estudiantes (id, codigo, nombres, apellidos, documento, email, telefono, programa, semestre, estado)
+            SELECT gen_random_uuid(), :codigo, :nombres, :apellidos, :documento, :email, :telefono, :programa, :semestre, CAST(:estado AS estadoestudiante)
             WHERE NOT EXISTS (SELECT 1 FROM estudiantes WHERE codigo = :codigo)
             RETURNING id
         """), est_encrypted)

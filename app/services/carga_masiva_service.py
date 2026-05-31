@@ -293,14 +293,6 @@ class CargaMasivaService:
         email = row.get("email", "").strip() or None
         documento = row.get("documento", "").strip() or None
         telefono = row.get("telefono", "").strip() or None
-        fecha_nacimiento_str = row.get("fecha_nacimiento", "").strip()
-        fecha_nacimiento = None
-        if fecha_nacimiento_str:
-            try:
-                fecha_nacimiento = datetime.strptime(fecha_nacimiento_str, "%Y-%m-%d").date()
-            except ValueError:
-                pass
-
         estado = EstadoEstudiante(estado_str)
 
         if existing:
@@ -316,8 +308,6 @@ class CargaMasivaService:
                 existing.documento = encrypt_data(documento)
             if telefono:
                 existing.telefono = encrypt_data(telefono)
-            if fecha_nacimiento:
-                existing.fecha_nacimiento = fecha_nacimiento
             return True
         else:
             # insert new student
@@ -331,7 +321,6 @@ class CargaMasivaService:
                 email=encrypt_data(email) if email else None,
                 documento=encrypt_data(documento) if documento else None,
                 telefono=encrypt_data(telefono) if telefono else None,
-                fecha_nacimiento=fecha_nacimiento,
             )
             self.db.add(nuevo)
             return False

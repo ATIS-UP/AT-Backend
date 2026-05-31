@@ -1,6 +1,5 @@
 """schemas for survey (encuesta) endpoints"""
 from typing import Optional
-from datetime import date
 from pydantic import BaseModel, Field
 
 
@@ -77,7 +76,6 @@ class InfoPublicaResponse(BaseModel):
 
 class VerificarEstudianteRequest(BaseModel):
     documento: str = Field(..., min_length=1, max_length=50)
-    fecha_nacimiento: date
 
 
 class VerificarEstudianteResponse(BaseModel):
@@ -90,5 +88,4 @@ class VerificarEstudianteResponse(BaseModel):
 
 class ResponderEncuestaPublica(BaseModel):
     documento: str = Field(..., min_length=1, max_length=50)
-    fecha_nacimiento: date
     respuestas: list[dict]
