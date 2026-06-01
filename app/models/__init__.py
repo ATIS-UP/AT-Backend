@@ -7,3 +7,4 @@ from app.models.caso_especial import RegistroCasoEspecial, HistorialRegistro, Ti
 from app.models.novedad_caso import NovedadCaso
 from app.models.actividad_institucional import ActividadInstitucional
 from app.models.anexo_actividad import AnexoActividad
+from app.models.bienestar import BienestarRegistro
