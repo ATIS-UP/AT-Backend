@@ -1,7 +1,15 @@
 """Service for Bienestar TCBU data: query, CSV bulk-load, template generation."""
 import csv
 import io
+import re
 from typing import Optional
+
+_PERIODO_RE = re.compile(r"^\d{4}-[1-9]\d*$")
+
+
+def _valid_periodo(p: str) -> bool:
+    """Return True if p looks like a valid academic period (e.g. 2026-1)."""
+    return bool(_PERIODO_RE.match(p))
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -157,6 +165,9 @@ class BienestarService:
             periodo = str(row.get("periodo", "")).strip()
             if not periodo:
                 errores.append({"fila": idx, "error": "periodo vacío"})
+                continue
+            if not _valid_periodo(periodo):
+                errores.append({"fila": idx, "error": f"periodo inválido '{periodo}' — use formato YYYY-N (ej: 2026-1)"})
                 continue
 
             for raw_col, servicio in header_map.items():

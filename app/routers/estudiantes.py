@@ -29,11 +29,12 @@ async def list_estudiantes(
     por_pagina: int = Query(20, ge=1, le=100),
     buscar: str = Query(None),
     estado: str = Query(None),
-    programa: str = Query(None)
+    programa: str = Query(None),
+    semestre: int = Query(None, ge=1, le=15),
 ):
     """list students with pagination and filters"""
     service = EstudianteService(db)
-    resultados, total = service.listar(pagina, por_pagina, buscar, estado, programa)
+    resultados, total = service.listar(pagina, por_pagina, buscar, estado, programa, semestre)
     return EstudianteListResponse(
         total=total, pagina=pagina, por_pagina=por_pagina, estudiantes=resultados
     )

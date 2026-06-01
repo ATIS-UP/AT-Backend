@@ -60,6 +60,7 @@ class EstudianteService:
         buscar: Optional[str] = None,
         estado: Optional[str] = None,
         programa: Optional[str] = None,
+        semestre: Optional[int] = None,
     ) -> tuple[list[EstudianteResponse], int]:
         """query students with filters, decrypt data, return results and total.
         Note: nombres/apellidos are encrypted, so ilike cannot match them at DB level.
@@ -68,6 +69,8 @@ class EstudianteService:
 
         if estado:
             query = query.filter(Estudiante.estado == estado)
+        if semestre is not None:
+            query = query.filter(Estudiante.semestre == semestre)
         if programa:
             safe_programa = sanitize_like_param(programa)
             query = query.filter(Estudiante.programa.ilike(f"%{safe_programa}%"))
