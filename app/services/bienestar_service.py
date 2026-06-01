@@ -5,16 +5,20 @@ from typing import Optional
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.exceptions import ValidationError
 from app.models.bienestar import BienestarRegistro, SERVICIOS_BIENESTAR
 from app.utils.audit import AuditService
 
-PERIODOS_ORDENADOS = [
-    "2021-1", "2021-2", "2022-1", "2022-2",
-    "2023-1", "2023-2", "2024-1", "2024-2", "2025-1",
-]
+
+def _periodo_sort_key(p: str) -> tuple[int, int]:
+    """Sort key for period strings like '2021-1'. Works for any future year."""
+    try:
+        year, sem = p.split("-")
+        return (int(year), int(sem))
+    except (ValueError, AttributeError):
+        return (9999, 9)
+
 
 # CSV column header → canonical service name
 _CSV_ALIAS: dict[str, str] = {
@@ -68,12 +72,7 @@ class BienestarService:
         }
         """
         rows = self.db.query(BienestarRegistro).all()
-
-        # collect all present periods, sorted by our canonical order
-        present_periods = sorted(
-            {r.periodo for r in rows},
-            key=lambda p: PERIODOS_ORDENADOS.index(p) if p in PERIODOS_ORDENADOS else 999,
-        )
+        present_periods = sorted({r.periodo for r in rows}, key=_periodo_sort_key)
 
         if periodo_inicio:
             present_periods = [p for p in present_periods if p >= periodo_inicio]
@@ -135,6 +134,21 @@ class BienestarService:
                 fields={"archivo": f"columnas detectadas: {', '.join(headers)}"},
             )
 
+        # collect valid periods from the file first
+        periodos_en_archivo = {
+            str(r.get("periodo", "")).strip()
+            for r in rows
+            if str(r.get("periodo", "")).strip()
+        }
+
+        # single query to load all existing rows for those periods
+        existing_records: dict[tuple[str, str], BienestarRegistro] = {
+            (rec.periodo, rec.servicio): rec
+            for rec in self.db.query(BienestarRegistro).filter(
+                BienestarRegistro.periodo.in_(periodos_en_archivo)
+            ).all()
+        }
+
         insertados = 0
         actualizados = 0
         errores: list[dict] = []
@@ -153,22 +167,20 @@ class BienestarService:
                     errores.append({"fila": idx, "error": f"valor inválido en {raw_col}: {val_str!r}"})
                     continue
 
-                existing = (
-                    self.db.query(BienestarRegistro)
-                    .filter_by(periodo=periodo, servicio=servicio)
-                    .first()
-                )
+                existing = existing_records.get((periodo, servicio))
                 if existing:
                     existing.cantidad = cantidad
                     existing.uploaded_by = usuario_id
                     actualizados += 1
                 else:
-                    self.db.add(BienestarRegistro(
+                    new_rec = BienestarRegistro(
                         periodo=periodo,
                         servicio=servicio,
                         cantidad=cantidad,
                         uploaded_by=usuario_id,
-                    ))
+                    )
+                    self.db.add(new_rec)
+                    existing_records[(periodo, servicio)] = new_rec
                     insertados += 1
 
         self.db.commit()
@@ -196,7 +208,7 @@ class BienestarService:
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["periodo"] + SERVICIOS_BIENESTAR)
-        writer.writerow(["2025-1"] + [0] * len(SERVICIOS_BIENESTAR))
+        writer.writerow(["2026-1"] + [0] * len(SERVICIOS_BIENESTAR))
         return output.getvalue().encode("utf-8-sig")
 
     # ── helpers ───────────────────────────────────────────────────────────────

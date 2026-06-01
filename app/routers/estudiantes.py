@@ -1,5 +1,8 @@
 """router for student operations - thin layer delegating to service"""
+import csv
+import io
 from fastapi import APIRouter, Depends, Request, Query, UploadFile, File, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -124,6 +127,24 @@ async def update_estudiante_estado(
     service = EstudianteService(db)
     return service.cambiar_estado(
         estudiante_id, estado_data.estado, str(current_user.id), request.client.host
+    )
+
+
+@router.get("/plantilla-csv")
+async def descargar_plantilla(
+    current_user: User = Depends(require_permiso("crear_estudiante")),
+):
+    """Download a CSV template for bulk student upload."""
+    headers_row = ["codigo", "nombres", "apellidos", "documento", "telefono", "email", "programa", "semestre", "estado"]
+    example_row = ["20261001", "María", "González Pérez", "1098765432", "3001234567", "mgonzalez@unipamplona.edu.co", "Ingeniería de Sistemas", "3", "ACTIVO"]
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(headers_row)
+    writer.writerow(example_row)
+    return Response(
+        content=buf.getvalue().encode("utf-8-sig"),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=plantilla_estudiantes.csv"},
     )
 
 

@@ -99,7 +99,7 @@ def seed_parametrizacion(conn):
     print("Creando parametrización...")
 
     parametros = [
-        ("PERIODO_ACTUAL", "2025-1", "Período académico actual", "texto"),
+        ("PERIODO_ACTUAL", "2026-1", "Período académico actual", "texto"),
         ("UMbral_ROJO", "2.0", "Promedio mínimo para riesgo rojo", "numero"),
         ("UMbral_AMARILLO", "3.0", "Promedio mínimo para riesgo amarillo", "numero"),
         ("NOTIFICAR_DOCENTE", "true", "Enviar notificación a docentes", "booleano"),
