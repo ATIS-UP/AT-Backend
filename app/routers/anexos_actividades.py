@@ -1,4 +1,5 @@
 """Router para Anexos de Actividades Institucionales"""
+import mimetypes
 from fastapi import APIRouter, Depends, File, UploadFile, Query, Request
 from sqlalchemy.orm import Session
 from fastapi.responses import FileResponse
@@ -48,11 +49,8 @@ async def descargar_anexo(
     service = get_service(db)
     file_path = service.descargar(anexo_id)
     anexo = service.obtener(anexo_id)
-    return FileResponse(
-        path=file_path,
-        filename=anexo["nombre"],
-        media_type="application/octet-stream",
-    )
+    media_type = mimetypes.guess_type(anexo["nombre"])[0] or "application/octet-stream"
+    return FileResponse(path=file_path, filename=anexo["nombre"], media_type=media_type)
 
 
 @router.delete("/anexos/{anexo_id}", status_code=204)

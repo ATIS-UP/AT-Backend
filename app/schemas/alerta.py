@@ -1,7 +1,7 @@
 """Schemas de alertas y actividades"""
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # Alertas
@@ -69,15 +69,15 @@ class AlertasStats(BaseModel):
 
 # Actividades
 class ActividadBase(BaseModel):
-    titulo: str
+    titulo: Optional[str] = None
     descripcion: Optional[str] = None
     tipo: str  # LLAMADA, VISITA, REUNION, EMAIL, OTRO
     resultado: Optional[str] = None
-    fecha_actividad: datetime
+    fecha_actividad: Optional[datetime] = None
 
 
 class ActividadCreate(ActividadBase):
-    alerta_id: str
+    pass  # alerta_id comes from URL path, not the request body
 
 
 class ActividadUpdate(BaseModel):

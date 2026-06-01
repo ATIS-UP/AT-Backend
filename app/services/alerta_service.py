@@ -1,6 +1,7 @@
 """service layer for alert operations"""
 from uuid import UUID
 from typing import Optional
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.exceptions import EntityNotFoundError, ValidationError
@@ -318,14 +319,22 @@ class AlertaService:
         if not alerta:
             raise EntityNotFoundError("Alerta", alerta_id)
 
+        _tipo_labels = {
+            "LLAMADA": "Llamada telefónica",
+            "VISITA": "Visita domiciliaria",
+            "REUNION": "Reunión presencial",
+            "EMAIL": "Correo electrónico",
+            "OTRO": "Actividad de seguimiento",
+        }
+        titulo = data.titulo or _tipo_labels.get(data.tipo, data.tipo)
         nueva = Actividad(
             alerta_id=alerta_id,
             usuario_id=usuario_id,
-            titulo=data.titulo,
+            titulo=titulo,
             descripcion=data.descripcion,
             tipo=data.tipo,
             resultado=data.resultado,
-            fecha_actividad=data.fecha_actividad,
+            fecha_actividad=data.fecha_actividad or datetime.now(),
         )
 
         self.db.add(nueva)

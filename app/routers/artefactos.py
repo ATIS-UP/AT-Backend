@@ -1,4 +1,5 @@
 """router for artifact (artefacto) operations - thin layer delegating to service"""
+import mimetypes
 from fastapi import APIRouter, Depends, Request, Query, UploadFile, File, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -68,8 +69,10 @@ async def download_artefacto(
 ):
     """download an artifact file"""
     service = ArtefactoService(db)
+    artefacto = service.obtener(artefacto_id)
     file_path = service.descargar(artefacto_id)
-    return FileResponse(path=file_path)
+    media_type = mimetypes.guess_type(artefacto["nombre"])[0] or "application/octet-stream"
+    return FileResponse(path=file_path, filename=artefacto["nombre"], media_type=media_type)
 
 
 @router.delete("/{artefacto_id}", status_code=status.HTTP_204_NO_CONTENT)

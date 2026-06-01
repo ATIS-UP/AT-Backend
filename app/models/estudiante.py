@@ -42,6 +42,11 @@ class Estudiante(Base):
     promedio_general = Column(Numeric(4, 2), nullable=True)  # Encriptado
     promedio_acumulado = Column(Numeric(4, 2), nullable=True)  # Encriptado
     estado = Column(Enum(EstadoEstudiante), default=EstadoEstudiante.ACTIVO)
+
+    # Caracterización socioeconómica
+    estrato = Column(Integer, nullable=True)          # 1-6
+    procedencia = Column(String(20), nullable=True)   # LOCAL | FORANEO
+    genero = Column(String(10), nullable=True)        # H | M | OTRO
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
