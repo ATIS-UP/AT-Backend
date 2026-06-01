@@ -6,14 +6,11 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.error_handlers import register_error_handlers
 from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos, novedades_casos, actividades_institucionales, anexos_actividades, caracterizacion, bienestar
-from app.database import Base, engine
-from app.models.caso_especial import RegistroCasoEspecial, HistorialRegistro
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """application lifecycle. create tables if not exist."""
-    Base.metadata.create_all(bind=engine)
+    """application lifecycle. tables are managed by alembic migrations."""
     yield
 
 
