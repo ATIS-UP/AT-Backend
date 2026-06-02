@@ -12,6 +12,7 @@ from app.schemas.encuesta import (
     EncuestaListResponse, RespuestaCreate, EncuestaResultados,
     VerificarEstudianteRequest, VerificarEstudianteResponse,
     ResponderEncuestaPublica, InfoPublicaResponse,
+    ProcesarVencimientosResponse,
 )
 from app.services.encuesta_service import EncuestaService
 
@@ -190,3 +191,15 @@ async def get_resultados(
     """get aggregated results for a survey"""
     service = EncuestaService(db)
     return service.obtener_resultados(encuesta_id)
+
+
+@router.post("/procesar-vencimientos", response_model=ProcesarVencimientosResponse)
+async def procesar_vencimientos(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """on-demand close of PUBLISHED surveys whose fecha_fin has passed.
+    intended to be called periodically (e.g. via a cron button in the admin UI)."""
+    service = EncuestaService(db)
+    return service.procesar_vencimientos()

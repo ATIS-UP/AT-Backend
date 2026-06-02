@@ -1,7 +1,7 @@
 """tests for encuesta service."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
@@ -16,6 +16,8 @@ def _make_encuesta(
     titulo="Encuesta Test",
     descripcion="Desc",
     periodo="2025-1",
+    fecha_fin=None,
+    fecha_inicio=None,
 ):
     """helper to create a mock encuesta object."""
     encuesta = MagicMock()
@@ -25,8 +27,8 @@ def _make_encuesta(
     encuesta.preguntas = preguntas or []
     encuesta.estado = estado
     encuesta.periodo = periodo
-    encuesta.fecha_inicio = None
-    encuesta.fecha_fin = None
+    encuesta.fecha_inicio = fecha_inicio
+    encuesta.fecha_fin = fecha_fin
     encuesta.es_publica = False
     encuesta.created_at = datetime(2025, 1, 1, 12, 0, 0)
     encuesta.updated_at = datetime(2025, 1, 1, 12, 0, 0)
@@ -121,6 +123,31 @@ class TestEncuestaServiceCrear:
 
         with pytest.raises(ValidationError, match="al menos 2 opciones"):
             service.crear(data, usuario_id="user-123")
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_crear_con_fecha_fin(self, mock_audit):
+        """fecha_fin opcional al crear, se persiste correctamente."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        fecha = datetime(2030, 6, 1, 0, 0, 0)
+        data = {
+            "titulo": "Con fecha",
+            "preguntas": [{"id": 1, "texto": "Q", "tipo": "texto_libre"}],
+            "fecha_fin": fecha,
+        }
+
+        def refresh_side_effect(obj):
+            obj.id = uuid.uuid4()
+            obj.created_at = datetime(2025, 1, 1)
+            obj.updated_at = datetime(2025, 1, 1)
+
+        db.refresh.side_effect = refresh_side_effect
+
+        result = service.crear(data, usuario_id="user-123")
+
+        assert result["fecha_fin"] is not None
+        assert db.add.called
 
 
 class TestEncuestaServicePublicar:
@@ -408,15 +435,106 @@ class TestEncuestaServiceActualizar:
     """tests for updating surveys."""
 
     @patch("app.services.encuesta_service.AuditService")
-    def test_actualizar_encuesta_publicada_raises(self, mock_audit):
+    def test_actualizar_cerrada_raises(self, mock_audit):
+        """closed surveys cannot be edited at all."""
         db = MagicMock()
         service = EncuestaService(db)
 
-        encuesta = _make_encuesta(estado="PUBLICADA")
+        encuesta = _make_encuesta(estado="CERRADA")
         db.query.return_value.filter.return_value.first.return_value = encuesta
 
-        with pytest.raises(ValidationError, match="estado BORRADOR"):
-            service.actualizar(str(encuesta.id), {"titulo": "Nuevo"}, "user-1")
+        with pytest.raises(ValidationError, match="BORRADOR o PUBLICADA"):
+            service.actualizar(str(encuesta.id), {"fecha_fin": "2025-12-31"}, "user-1")
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_actualizar_publicada_solo_fecha_fin(self, mock_audit):
+        """PUBLICADA surveys can only be updated for fecha_fin (auto-close deadline)."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        nueva_fecha = datetime(2030, 6, 1, 0, 0, 0)
+        encuesta = _make_encuesta(estado="PUBLICADA", titulo="Original")
+        db.query.return_value.filter.return_value.first.return_value = encuesta
+
+        result = service.actualizar(str(encuesta.id), {"fecha_fin": nueva_fecha}, "user-1")
+
+        # fecha_fin should be set, but titulo untouched
+        assert encuesta.fecha_fin == nueva_fecha
+        assert encuesta.titulo == "Original"
+        assert db.commit.called
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_actualizar_publicada_no_permite_cambiar_titulo(self, mock_audit):
+        """PUBLICADA surveys should ignore cambios to titulo/preguntas."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        encuesta = _make_encuesta(estado="PUBLICADA", titulo="Original")
+        db.query.return_value.filter.return_value.first.return_value = encuesta
+
+        service.actualizar(str(encuesta.id), {"titulo": "Nuevo"}, "user-1")
+
+        assert encuesta.titulo == "Original"
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_actualizar_fecha_fin_null(self, mock_audit):
+        """fecha_fin can be cleared by sending null."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        encuesta = _make_encuesta(
+            estado="BORRADOR",
+            fecha_fin=datetime(2030, 1, 1),
+        )
+        db.query.return_value.filter.return_value.first.return_value = encuesta
+
+        service.actualizar(str(encuesta.id), {"fecha_fin": None}, "user-1")
+
+        assert encuesta.fecha_fin is None
+
+
+class TestEncuestaServiceProcesarVencimientos:
+    """tests for the on-demand expiration sweeper."""
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_procesar_vencimientos_cierra_encuestas_vencidas(self, mock_audit):
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        pasada = datetime.now(timezone.utc) - timedelta(days=1)
+        futura = datetime.now(timezone.utc) + timedelta(days=1)
+
+        # el mock representa el resultado YA FILTRADO por la BD
+        # (estado='PUBLICADA' AND fecha_fin IS NOT NULL AND fecha_fin <= ahora)
+        vencida = _make_encuesta(estado="PUBLICADA", fecha_fin=pasada)
+        otra_vencida = _make_encuesta(estado="PUBLICADA", fecha_fin=pasada)
+
+        query_chain = MagicMock()
+        query_chain.filter.return_value.all.return_value = [vencida, otra_vencida]
+        db.query.return_value = query_chain
+
+        result = service.procesar_vencimientos()
+
+        assert result["cerradas"] == 2
+        assert result["procesadas"] == 2
+        assert vencida.estado == "CERRADA"
+        assert otra_vencida.estado == "CERRADA"
+        assert db.commit.called
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_procesar_venimientos_sin_candidatas(self, mock_audit):
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        query_chain = MagicMock()
+        query_chain.filter.return_value.all.return_value = []
+        db.query.return_value = query_chain
+
+        result = service.procesar_vencimientos()
+
+        assert result["cerradas"] == 0
+        assert result["procesadas"] == 0
+        assert "fecha_referencia" in result
 
 
 class TestEncuestaServiceEliminar:

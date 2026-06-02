@@ -1,4 +1,5 @@
 """schemas for survey (encuesta) endpoints"""
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -16,6 +17,7 @@ class EncuestaCreate(BaseModel):
     descripcion: Optional[str] = None
     preguntas: list[PreguntaEncuesta]
     periodo: Optional[str] = None
+    fecha_fin: Optional[datetime] = None
 
 
 class EncuestaUpdate(BaseModel):
@@ -23,6 +25,7 @@ class EncuestaUpdate(BaseModel):
     descripcion: Optional[str] = None
     preguntas: Optional[list[PreguntaEncuesta]] = None
     periodo: Optional[str] = None
+    fecha_fin: Optional[datetime] = None
 
 
 class EncuestaResponse(BaseModel):
@@ -89,3 +92,9 @@ class VerificarEstudianteResponse(BaseModel):
 class ResponderEncuestaPublica(BaseModel):
     documento: str = Field(..., min_length=1, max_length=50)
     respuestas: list[dict]
+
+
+class ProcesarVencimientosResponse(BaseModel):
+    cerradas: int
+    procesadas: int
+    fecha_referencia: str

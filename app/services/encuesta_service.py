@@ -49,6 +49,10 @@ class EncuestaService:
                 p["id"] = i + 1
         self._validar_preguntas(preguntas)
 
+        fecha_fin = data.get("fecha_fin")
+        if isinstance(fecha_fin, str):
+            fecha_fin = datetime.fromisoformat(fecha_fin.replace("Z", "+00:00"))
+
         encuesta = Encuesta(
             id=uuid.uuid4(),
             titulo=data["titulo"],
@@ -56,6 +60,7 @@ class EncuestaService:
             preguntas=preguntas,
             estado="BORRADOR",
             periodo=data.get("periodo"),
+            fecha_fin=fecha_fin,
         )
 
         self.db.add(encuesta)
@@ -73,29 +78,40 @@ class EncuestaService:
         return self._to_dict(encuesta)
 
     def actualizar(self, encuesta_id: str, data: dict, usuario_id: str) -> dict:
-        """update a survey. only allowed when in BORRADOR state."""
+        """update a survey. only allowed when in BORRADOR state.
+        fecha_fin can also be set/updated while PUBLICADA (used as auto-close deadline)."""
         encuesta = self._get_or_raise(encuesta_id)
 
-        if encuesta.estado != "BORRADOR":
+        if encuesta.estado not in ("BORRADOR", "PUBLICADA"):
             raise ValidationError(
-                "Solo se pueden editar encuestas en estado BORRADOR"
+                "Solo se pueden editar encuestas en estado BORRADOR o PUBLICADA"
             )
 
         datos_anteriores = self._to_dict(encuesta)
 
-        if "titulo" in data:
-            encuesta.titulo = data["titulo"]
-        if "descripcion" in data:
-            encuesta.descripcion = data["descripcion"]
-        if "preguntas" in data:
-            preguntas = data["preguntas"]
-            for i, p in enumerate(preguntas):
-                if p.get("id") is None:
-                    p["id"] = i + 1
-            self._validar_preguntas(preguntas)
-            encuesta.preguntas = preguntas
-        if "periodo" in data:
-            encuesta.periodo = data["periodo"]
+        if encuesta.estado == "BORRADOR":
+            if "titulo" in data:
+                encuesta.titulo = data["titulo"]
+            if "descripcion" in data:
+                encuesta.descripcion = data["descripcion"]
+            if "preguntas" in data:
+                preguntas = data["preguntas"]
+                for i, p in enumerate(preguntas):
+                    if p.get("id") is None:
+                        p["id"] = i + 1
+                self._validar_preguntas(preguntas)
+                encuesta.preguntas = preguntas
+            if "periodo" in data:
+                encuesta.periodo = data["periodo"]
+
+        if "fecha_fin" in data:
+            fecha_fin = data["fecha_fin"]
+            if fecha_fin is None:
+                encuesta.fecha_fin = None
+            elif isinstance(fecha_fin, str):
+                encuesta.fecha_fin = datetime.fromisoformat(fecha_fin.replace("Z", "+00:00"))
+            else:
+                encuesta.fecha_fin = fecha_fin
 
         self.db.commit()
         self.db.refresh(encuesta)
@@ -110,6 +126,51 @@ class EncuestaService:
         )
 
         return self._to_dict(encuesta)
+
+    def procesar_vencimientos(self) -> dict:
+        """close any PUBLICADA surveys whose fecha_fin has passed.
+        returns counts of surveys closed vs total processed."""
+        ahora = datetime.now(timezone.utc)
+
+        candidatas = (
+            self.db.query(Encuesta)
+            .filter(
+                Encuesta.estado == "PUBLICADA",
+                Encuesta.fecha_fin.isnot(None),
+                Encuesta.fecha_fin <= ahora,
+            )
+            .all()
+        )
+
+        procesadas = len(candidatas)
+        cerradas = 0
+
+        for encuesta in candidatas:
+            datos_anteriores = {
+                "estado": encuesta.estado,
+                "fecha_fin": (
+                    encuesta.fecha_fin.isoformat() if encuesta.fecha_fin else None
+                ),
+            }
+            encuesta.estado = "CERRADA"
+            cerradas += 1
+
+            AuditService.log_actualizar(
+                db=self.db,
+                usuario_id=None,
+                entidad="Encuesta",
+                entidad_id=str(encuesta.id),
+                datos_anteriores=datos_anteriores,
+                datos_nuevos={"estado": "CERRADA", "motivo": "vencimiento_fecha_fin"},
+            )
+
+        self.db.commit()
+
+        return {
+            "cerradas": cerradas,
+            "procesadas": procesadas,
+            "fecha_referencia": ahora.isoformat(),
+        }
 
     def eliminar(self, encuesta_id: str, usuario_id: str) -> None:
         """delete a survey and its responses."""
