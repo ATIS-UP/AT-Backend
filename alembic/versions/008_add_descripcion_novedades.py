@@ -1,7 +1,7 @@
 """add descripcion to novedades_casos
 
 Revision ID: 008_add_descripcion_novedades
-Revises: 1a2b3c4d5e6f
+Revises: 007
 Create Date: 2026-06-01 19:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 
 revision: str = "008_add_descripcion_novedades"
-down_revision: Union[str, None] = "1a2b3c4d5e6f"
+down_revision: Union[str, None] = "007"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
