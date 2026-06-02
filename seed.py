@@ -308,20 +308,42 @@ NOVEDADES_POR_TIPO = {
 
 
 def seed_novedades(conn):
-    """Crea novedades iniciales para cada tipo de caso"""
-    print("Creando novedades de casos especiales...")
-    total = 0
+    """Crea/actualiza novedades para cada tipo de caso.
+
+    Para cada novedad del catálogo:
+      - Si no existe, la inserta.
+      - Si existe pero su descripcion es NULL (filas遗留 del seed original
+        que no incluia esa columna), actualiza la descripcion.
+    """
+    print("Creando/actualizando novedades de casos especiales...")
+    total_inserted = 0
+    total_updated = 0
     for tipo_caso, novedades in NOVEDADES_POR_TIPO.items():
         for idx, (nombre, descripcion) in enumerate(novedades, 1):
+            result = conn.execute(text("""
+                UPDATE novedades_casos
+                SET descripcion = :descripcion
+                WHERE tipo_caso = :tipo_caso
+                  AND nombre = :nombre
+                  AND descripcion IS NULL
+            """), {"tipo_caso": tipo_caso, "nombre": nombre, "descripcion": descripcion})
+            if result.rowcount > 0:
+                total_updated += result.rowcount
+                continue
+
+            existing = conn.execute(text("""
+                SELECT 1 FROM novedades_casos
+                WHERE tipo_caso = :tipo_caso AND nombre = :nombre
+            """), {"tipo_caso": tipo_caso, "nombre": nombre}).first()
+            if existing:
+                continue
+
             conn.execute(text("""
                 INSERT INTO novedades_casos (id, tipo_caso, nombre, descripcion, activo, orden)
                 SELECT gen_random_uuid(), :tipo_caso, :nombre, :descripcion, true, :orden
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM novedades_casos WHERE tipo_caso = :tipo_caso AND nombre = :nombre
-                )
             """), {"tipo_caso": tipo_caso, "nombre": nombre, "descripcion": descripcion, "orden": idx})
-            total += 1
-    print(f"  - {total} novedades creadas/verificadas")
+            total_inserted += 1
+    print(f"  - {total_inserted} novedades insertadas, {total_updated} actualizadas con descripcion")
 
 
 def main():
