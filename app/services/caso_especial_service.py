@@ -120,13 +120,6 @@ class CasoEspecialService:
         if estudiante.estado != EstadoEstudiante.ACTIVO:
             raise ValidationError(f"No se pueden crear registros de casos para estudiantes en estado {estudiante.estado.value}")
 
-        registro_cerrado = self.db.query(RegistroCasoEspecial).filter(
-            RegistroCasoEspecial.estudiante_id == UUID(data.estudiante_id),
-            RegistroCasoEspecial.estado == EstadoRegistroCaso.CERRADO,
-        ).first()
-        if registro_cerrado:
-            raise ValidationError("No se pueden añadir nuevos registros: el estudiante ya tiene un caso especial cerrado")
-
         if not data.novedad_id:
             raise ValidationError("Debe seleccionar una novedad para el caso")
 

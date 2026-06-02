@@ -102,35 +102,8 @@ class TestCasoEspecialServiceDescripcionNovedad:
         assert response.novedad is None
 
 
-class TestCasoEspecialServiceCrearBloqueoCerrado:
-    """validates that crear() blocks when student has a CERRADO record."""
-
-    def test_crear_bloquea_si_estudiante_tiene_caso_cerrado(self):
-        estudiante = _make_estudiante()
-        novedad = _make_novedad()
-        registro_cerrado = _make_registro(estado=EstadoRegistroCaso.CERRADO)
-
-        db = MagicMock()
-        # first .query(Estudiante) call returns estudiante
-        # second .query(RegistroCasoEspecial) call returns registro_cerrado
-        db.query.side_effect = [
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=estudiante)))),
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=registro_cerrado)))),
-        ]
-
-        service = CasoEspecialService(db)
-
-        from app.schemas.caso_especial import RegistroCasoCreate
-        data = RegistroCasoCreate(
-            estudiante_id=str(estudiante.id),
-            tipo=TipoRegistroCaso.RENDIMIENTO_ACADEMICO.value,
-            novedad_id=str(novedad.id),
-            observaciones="Test",
-        )
-
-        with pytest.raises(ValidationError) as exc:
-            service.crear(data, str(uuid.uuid4()), "User")
-        assert "cerrado" in str(exc.value.message).lower()
+class TestCasoEspecialServiceCrear:
+    """validates that crear() allows multiple cases per student (no CERRADO block)."""
 
     def test_crear_bloquea_si_estudiante_no_activo(self):
         estudiante = _make_estudiante(estado=EstadoEstudiante.INACTIVO)
@@ -157,10 +130,8 @@ class TestCasoEspecialServiceCrearBloqueoCerrado:
 
         db = MagicMock()
         # query(Estudiante) -> estudiante
-        # query(RegistroCasoEspecial) -> None (no cerrado)
         db.query.side_effect = [
             MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=estudiante)))),
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=None)))),
         ]
 
         service = CasoEspecialService(db)
@@ -184,7 +155,6 @@ class TestCasoEspecialServiceCrearBloqueoCerrado:
         db = MagicMock()
         db.query.side_effect = [
             MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=estudiante)))),
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=None)))),
             MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=novedad)))),
         ]
 
@@ -209,13 +179,10 @@ class TestCasoEspecialServiceCrearBloqueoCerrado:
         db = MagicMock()
         db.query.side_effect = [
             MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=estudiante)))),
-            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=None)))),
             MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=novedad)))),
         ]
 
         created_registros = []
-
-        original_init = None
 
         def fake_add(obj):
             # Captura el registro creado (el primer add es el registro, el segundo el historial)
@@ -248,6 +215,48 @@ class TestCasoEspecialServiceCrearBloqueoCerrado:
         assert db.add.call_count == 2
         db.commit.assert_called_once()
         db.flush.assert_called_once()
+
+    def test_crear_permite_multiples_casos_para_mismo_estudiante(self):
+        """un estudiante puede tener varios casos a lo largo del tiempo, incluso
+        si ya tiene un caso CERRADO. Este test verifica que crear() ya no lanza
+        ValidationError cuando hay un registro CERRADO previo."""
+        estudiante = _make_estudiante()
+        novedad = _make_novedad()
+
+        db = MagicMock()
+        db.query.side_effect = [
+            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=estudiante)))),
+            MagicMock(filter=MagicMock(return_value=MagicMock(first=MagicMock(return_value=novedad)))),
+        ]
+
+        created_registros = []
+
+        def fake_add(obj):
+            if not created_registros:
+                obj.estudiante = estudiante
+                obj.novedad = novedad
+                obj.created_at = datetime(2025, 1, 1, 12, 0, 0)
+                obj.updated_at = datetime(2025, 1, 1, 12, 0, 0)
+                created_registros.append(obj)
+            else:
+                created_registros.append(obj)
+
+        db.add.side_effect = fake_add
+        db.refresh = MagicMock(side_effect=lambda obj: None)
+
+        service = CasoEspecialService(db)
+
+        from app.schemas.caso_especial import RegistroCasoCreate
+        data = RegistroCasoCreate(
+            estudiante_id=str(estudiante.id),
+            tipo=TipoRegistroCaso.RENDIMIENTO_ACADEMICO.value,
+            novedad_id=str(novedad.id),
+            observaciones="Segundo caso del mismo estudiante",
+        )
+
+        # No debe lanzar ValidationError por CERRADO previo
+        service.crear(data, str(uuid.uuid4()), "User")
+        assert db.add.call_count == 2
 
 
 class TestCasoEspecialServiceAgregarHistorialBloqueoCerrado:
