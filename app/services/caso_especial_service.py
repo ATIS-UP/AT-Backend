@@ -37,7 +37,11 @@ class CasoEspecialService:
     def _registro_to_response(self, registro: RegistroCasoEspecial) -> RegistroCasoResponse:
         novedad_info = None
         if registro.novedad:
-            novedad_info = NovedadInfo(id=str(registro.novedad.id), nombre=registro.novedad.nombre)
+            novedad_info = NovedadInfo(
+                id=str(registro.novedad.id),
+                nombre=registro.novedad.nombre,
+                descripcion=registro.novedad.descripcion,
+            )
         return RegistroCasoResponse(
             id=str(registro.id),
             estudiante_id=str(registro.estudiante_id),
@@ -115,6 +119,13 @@ class CasoEspecialService:
             raise EntityNotFoundError("Estudiante", data.estudiante_id)
         if estudiante.estado != EstadoEstudiante.ACTIVO:
             raise ValidationError(f"No se pueden crear registros de casos para estudiantes en estado {estudiante.estado.value}")
+
+        registro_cerrado = self.db.query(RegistroCasoEspecial).filter(
+            RegistroCasoEspecial.estudiante_id == UUID(data.estudiante_id),
+            RegistroCasoEspecial.estado == EstadoRegistroCaso.CERRADO,
+        ).first()
+        if registro_cerrado:
+            raise ValidationError("No se pueden añadir nuevos registros: el estudiante ya tiene un caso especial cerrado")
 
         if not data.novedad_id:
             raise ValidationError("Debe seleccionar una novedad para el caso")
@@ -218,10 +229,13 @@ class CasoEspecialService:
         registro = self.db.query(RegistroCasoEspecial).filter(
             RegistroCasoEspecial.id == UUID(registro_id)
         ).first()
-        
+
         if not registro:
             return None
-        
+
+        if registro.estado == EstadoRegistroCaso.CERRADO:
+            raise ValidationError("No se pueden añadir seguimientos a un caso cerrado")
+
         historial = HistorialRegistro(
             registro_id=registro.id,
             accion=accion.upper(),

@@ -16,6 +16,7 @@ class NovedadCasoService:
             id=str(n.id),
             tipo_caso=n.tipo_caso,
             nombre=n.nombre,
+            descripcion=n.descripcion,
             activo=n.activo,
             orden=n.orden,
             created_at=n.created_at,
@@ -33,6 +34,7 @@ class NovedadCasoService:
         novedad = NovedadCaso(
             tipo_caso=data.tipo_caso,
             nombre=data.nombre,
+            descripcion=data.descripcion,
             orden=data.orden,
         )
         self.db.add(novedad)
@@ -46,6 +48,8 @@ class NovedadCasoService:
             return None
         if data.nombre is not None:
             novedad.nombre = data.nombre
+        if data.descripcion is not None:
+            novedad.descripcion = data.descripcion
         if data.activo is not None:
             novedad.activo = data.activo
         if data.orden is not None:

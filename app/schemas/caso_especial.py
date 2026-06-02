@@ -35,6 +35,7 @@ class RegistroCasoUpdate(BaseModel):
 class NovedadInfo(BaseModel):
     id: str
     nombre: str
+    descripcion: Optional[str] = None
 
     class Config:
         from_attributes = True

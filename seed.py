@@ -283,26 +283,26 @@ def seed_estudiantes_dummy(conn):
 
 NOVEDADES_POR_TIPO = {
     "RENDIMIENTO_ACADEMICO": [
-        "Bajo rendimiento acumulado",
-        "Pérdida recurrente de asignaturas",
-        "Inasistencia injustificada",
-        "Falta de competencias básicas",
-        "Otra",
+        ("Bajo rendimiento acumulado", "Estudiantes que entran en prueba académica o tienen un promedio por debajo del estándar institucional."),
+        ("Pérdida recurrente de asignaturas", "Especialmente cuando se trata de materias del núcleo básico."),
+        ("Inasistencia injustificada", "Ausencias reiteradas que superan el porcentaje permitido o que muestran un patrón de desconexión."),
+        ("Falta de competencias básicas", "Dificultades marcadas en lectoescritura, razonamiento lógico o métodos de estudio."),
+        ("Otra", None),
     ],
     "PSICOSOCIAL": [
-        "Crisis emocionales o ansiedad",
-        "Problemas familiares",
-        "Consumo de sustancias",
-        "Dificultades de adaptación",
+        ("Crisis emocionales o ansiedad", "Manifestaciones de estrés elevado, depresión o cambios drásticos en el comportamiento."),
+        ("Problemas familiares", "Duelos, separaciones o conflictos en el hogar que interfieren con la concentración del estudiante."),
+        ("Consumo de sustancias", "Casos detectados o sospechas de abuso de alcohol o sustancias psicoactivas."),
+        ("Dificultades de adaptación", "Común en estudiantes que provienen de otras regiones (foráneos) y presentan problemas para integrarse al entorno universitario o a la ciudad."),
     ],
     "SOCIO_ECONOMICO": [
-        "Inestabilidad financiera",
-        "Inseguridad alimentaria",
-        "Carga laboral excesiva",
+        ("Inestabilidad financiera", "Dificultades para cubrir el pago de matrícula, materiales de estudio o transporte."),
+        ("Inseguridad alimentaria", "Estudiantes que no cuentan con los recursos para una nutrición adecuada durante la jornada académica."),
+        ("Carga laboral excesiva", "Estudiantes que trabajan jornadas extensas que les impiden cumplir con sus compromisos académicos."),
     ],
     "INSTITUCIONAL_VOCACIONAL": [
-        "Inconformidad con la carrera",
-        "Desconocimiento de servicios",
+        ("Inconformidad con la carrera", "Dudas sobre la elección profesional o falta de motivación con el plan de estudios."),
+        ("Desconocimiento de servicios", "Estudiantes que requieren orientación sobre becas, subsidios o apoyos institucionales y no saben cómo acceder a ellos."),
     ],
 }
 
@@ -312,14 +312,14 @@ def seed_novedades(conn):
     print("Creando novedades de casos especiales...")
     total = 0
     for tipo_caso, novedades in NOVEDADES_POR_TIPO.items():
-        for idx, nombre in enumerate(novedades, 1):
+        for idx, (nombre, descripcion) in enumerate(novedades, 1):
             conn.execute(text("""
-                INSERT INTO novedades_casos (id, tipo_caso, nombre, activo, orden)
-                SELECT gen_random_uuid(), :tipo_caso, :nombre, true, :orden
+                INSERT INTO novedades_casos (id, tipo_caso, nombre, descripcion, activo, orden)
+                SELECT gen_random_uuid(), :tipo_caso, :nombre, :descripcion, true, :orden
                 WHERE NOT EXISTS (
                     SELECT 1 FROM novedades_casos WHERE tipo_caso = :tipo_caso AND nombre = :nombre
                 )
-            """), {"tipo_caso": tipo_caso, "nombre": nombre, "orden": idx})
+            """), {"tipo_caso": tipo_caso, "nombre": nombre, "descripcion": descripcion, "orden": idx})
             total += 1
     print(f"  - {total} novedades creadas/verificadas")
 
