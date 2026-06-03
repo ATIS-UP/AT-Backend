@@ -83,6 +83,19 @@ class EncuestaPublicaService:
             .filter(Estudiante.documento_hash == documento_hash)
             .first()
         )
+
+        # Fallback: full scan + decrypt for legacy students without documento_hash
+        if not estudiante:
+            all_students = self.db.query(Estudiante).all()
+            for est in all_students:
+                if not est.documento:
+                    continue
+                decrypted = decrypt_data(est.documento)
+                if decrypted == documento:
+                    estudiante = est
+                    est.documento_hash = documento_hash
+                    self.db.commit()
+                    break
         if not estudiante:
             return {"existe": False, "ya_respondio": False, "puede_responder": False,
                     "estudiante_nombre": None, "estudiante_id": None}
