@@ -56,7 +56,7 @@ class HistorialRegistro(Base):
     __tablename__ = "historial_registros"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    registro_id = Column(UUID(as_uuid=True), ForeignKey("registros_casos_especiales.id"), nullable=False, index=True)
+    registro_id = Column(UUID(as_uuid=True), ForeignKey("registros_casos_especiales.id", ondelete="CASCADE"), nullable=False, index=True)
     accion = Column(String(50), nullable=False)
     observaciones = Column(Text, nullable=True)
     responsable_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
