@@ -154,6 +154,18 @@ async def publicar_encuesta(
     return service.publicar(encuesta_id, str(current_user.id))
 
 
+@router.post("/{encuesta_id}/duplicar", response_model=EncuestaResponse)
+async def duplicar_encuesta(
+    encuesta_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """clone a PUBLISHED or CLOSED survey as a new BORRADOR (without responses)."""
+    service = EncuestaService(db)
+    return service.duplicar(encuesta_id, str(current_user.id))
+
+
 @router.post("/{encuesta_id}/cerrar", response_model=EncuestaResponse)
 async def cerrar_encuesta(
     encuesta_id: str,

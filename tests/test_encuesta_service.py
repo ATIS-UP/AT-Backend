@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 import pytest
 
 from app.exceptions import EntityNotFoundError, ValidationError, DuplicateEntityError
+from app.models.alerta import Encuesta
 from app.services.encuesta_service import EncuestaService
 
 
@@ -552,3 +553,129 @@ class TestEncuestaServiceEliminar:
 
         assert db.delete.called
         assert db.commit.called
+
+
+class TestEncuestaServiceDuplicar:
+    """tests for cloning PUBLISHED/CLOSED surveys as new BORRADOR."""
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_duplicar_encuesta_cerrada(self, mock_audit):
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        original = _make_encuesta(
+            estado="CERRADA",
+            titulo="Original",
+            preguntas=[
+                {"id": 1, "texto": "Q1", "tipo": "texto_libre"},
+                {"id": 7, "texto": "Q2", "tipo": "opcion_multiple", "opciones": ["a", "b"]},
+            ],
+            fecha_fin=datetime(2025, 6, 1),
+        )
+        db.query.return_value.filter.return_value.first.return_value = original
+
+        def refresh_side_effect(obj):
+            obj.id = uuid.uuid4()
+            obj.created_at = datetime(2025, 1, 1)
+
+        db.refresh.side_effect = refresh_side_effect
+
+        result = service.duplicar(str(original.id), "user-1")
+
+        assert result["titulo"] == "Original (copia)"
+        assert result["estado"] == "BORRADOR"
+        assert result["fecha_inicio"] is None
+        assert result["fecha_fin"] is None
+        assert result["preguntas"][0]["id"] == 1
+        assert result["preguntas"][1]["id"] == 2
+        assert result["preguntas"][1]["opciones"] == ["a", "b"]
+        assert db.add.called
+        assert db.commit.called
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_duplicar_encuesta_publicada(self, mock_audit):
+        """PUBLICADA surveys can also be duplicated."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        original = _make_encuesta(
+            estado="PUBLICADA",
+            titulo="Publicada",
+            preguntas=[{"id": 1, "texto": "Q", "tipo": "texto_libre"}],
+        )
+        db.query.return_value.filter.return_value.first.return_value = original
+
+        def refresh_side_effect(obj):
+            obj.id = uuid.uuid4()
+            obj.created_at = datetime(2025, 1, 1)
+
+        db.refresh.side_effect = refresh_side_effect
+
+        result = service.duplicar(str(original.id), "user-1")
+
+        assert result["titulo"] == "Publicada (copia)"
+        assert result["estado"] == "BORRADOR"
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_duplicar_encuesta_borrador_raises(self, mock_audit):
+        """BORRADOR surveys cannot be duplicated (use edit instead)."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        original = _make_encuesta(estado="BORRADOR")
+        db.query.return_value.filter.return_value.first.return_value = original
+
+        with pytest.raises(ValidationError, match="PUBLICADA o CERRADA"):
+            service.duplicar(str(original.id), "user-1")
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_duplicar_reasigna_ids_preguntas(self, mock_audit):
+        """Question IDs are reset to 1, 2, 3 in the clone (not copied from original)."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        original = _make_encuesta(
+            estado="CERRADA",
+            preguntas=[
+                {"id": 99, "texto": "Q1", "tipo": "texto_libre"},
+                {"id": 100, "texto": "Q2", "tipo": "texto_libre"},
+                {"id": 101, "texto": "Q3", "tipo": "texto_libre"},
+            ],
+        )
+        db.query.return_value.filter.return_value.first.return_value = original
+
+        def refresh_side_effect(obj):
+            obj.id = uuid.uuid4()
+            obj.created_at = datetime(2025, 1, 1)
+
+        db.refresh.side_effect = refresh_side_effect
+
+        result = service.duplicar(str(original.id), "user-1")
+
+        ids = [p["id"] for p in result["preguntas"]]
+        assert ids == [1, 2, 3]
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_duplicar_sin_respuestas(self, mock_audit):
+        """The clone has no associated responses (RespuestaEncuesta linked to original)."""
+        db = MagicMock()
+        service = EncuestaService(db)
+
+        original = _make_encuesta(
+            estado="CERRADA",
+            preguntas=[{"id": 1, "texto": "Q", "tipo": "texto_libre"}],
+        )
+        db.query.return_value.filter.return_value.first.return_value = original
+
+        def refresh_side_effect(obj):
+            obj.id = uuid.uuid4()
+            obj.created_at = datetime(2025, 1, 1)
+
+        db.refresh.side_effect = refresh_side_effect
+
+        service.duplicar(str(original.id), "user-1")
+
+        # verify that the new Encuesta object was added (not a new RespuestaEncuesta)
+        added_obj = db.add.call_args[0][0]
+        assert isinstance(added_obj, Encuesta)
+        assert added_obj.estado == "BORRADOR"

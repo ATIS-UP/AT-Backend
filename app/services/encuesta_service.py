@@ -188,6 +188,53 @@ class EncuestaService:
             datos_eliminados=datos_eliminados,
         )
 
+    def duplicar(self, encuesta_id: str, usuario_id: str) -> dict:
+        """clone a PUBLISHED or CLOSED survey as a new BORRADOR.
+        copies titulo + descripcion + preguntas (with options) + periodo.
+        resets estado to BORRADOR, clears fechas, does NOT copy responses."""
+        original = self._get_or_raise(encuesta_id)
+
+        if original.estado not in ("PUBLICADA", "CERRADA"):
+            raise ValidationError(
+                "Solo se pueden duplicar encuestas en estado PUBLICADA o CERRADA"
+            )
+
+        preguntas_originales = original.preguntas or []
+        nuevas_preguntas = [
+            {**p, "id": i + 1}
+            for i, p in enumerate(preguntas_originales)
+        ]
+
+        clon = Encuesta(
+            id=uuid.uuid4(),
+            titulo=f"{original.titulo} (copia)",
+            descripcion=original.descripcion,
+            preguntas=nuevas_preguntas,
+            estado="BORRADOR",
+            periodo=original.periodo,
+            fecha_inicio=None,
+            fecha_fin=None,
+            es_publica=False,
+        )
+
+        self.db.add(clon)
+        self.db.commit()
+        self.db.refresh(clon)
+
+        AuditService.log_crear(
+            db=self.db,
+            usuario_id=usuario_id,
+            entidad="Encuesta",
+            entidad_id=str(clon.id),
+            datos={
+                "titulo": clon.titulo,
+                "num_preguntas": len(nuevas_preguntas),
+                "duplicado_de": str(original.id),
+            },
+        )
+
+        return self._to_dict(clon)
+
     def publicar(self, encuesta_id: str, usuario_id: str) -> dict:
         """publish a survey: transition from BORRADOR to PUBLICADA.
         requires at least one question."""
