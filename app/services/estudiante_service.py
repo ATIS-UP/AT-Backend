@@ -14,7 +14,7 @@ from app.schemas.estudiante import (
     HistorialAcademico,
     InscripcionResponse,
 )
-from app.utils.security import encrypt_data, decrypt_data, sanitize_like_param
+from app.utils.security import encrypt_data, decrypt_data, sanitize_like_param, hash_data
 from app.utils.audit import AuditService
 from app.exceptions import EntityNotFoundError, DuplicateEntityError, ValidationError
 from itertools import chain
@@ -151,6 +151,7 @@ class EstudianteService:
             apellidos=encrypt_data(data.apellidos),
             email=encrypt_data(data.email) if data.email else None,
             documento=encrypt_data(data.documento) if data.documento else None,
+            documento_hash=hash_data(data.documento) if data.documento else None,
             telefono=encrypt_data(data.telefono) if data.telefono else None,
             programa=data.programa,
             semestre=data.semestre,
@@ -225,6 +226,9 @@ class EstudianteService:
                     setattr(est, key, encrypt_data(str(value)))
                 else:
                     setattr(est, key, value)
+
+        if "documento" in update_data and update_data["documento"] is not None:
+            est.documento_hash = hash_data(update_data["documento"])
 
         self.db.commit()
         self.db.refresh(est)

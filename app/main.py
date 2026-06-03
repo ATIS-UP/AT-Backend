@@ -1,11 +1,15 @@
 """Aplicación principal FastAPI"""
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.config import settings
+from app.database import get_db
 from app.error_handlers import register_error_handlers
-from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos, novedades_casos, actividades_institucionales, anexos_actividades, caracterizacion, bienestar, monitoreo, participacion
+from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos, novedades_casos, actividades_institucionales, anexos_actividades, caracterizacion, bienestar, monitoreo
 
 
 @asynccontextmanager
@@ -51,7 +55,6 @@ app.include_router(anexos_actividades.router)
 app.include_router(caracterizacion.router)
 app.include_router(bienestar.router)
 app.include_router(monitoreo.router)
-app.include_router(participacion.router)
 
 
 @app.get("/")
@@ -65,9 +68,16 @@ async def root():
 
 
 @app.get("/health")
-async def health():
-    """Health check"""
-    return {"status": "healthy"}
+async def health(db: Session = Depends(get_db)):
+    """Health check with database connectivity verification."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "connected"}
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": "disconnected"}
+        )
 
 
 if __name__ == "__main__":

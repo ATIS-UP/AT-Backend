@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.exceptions import EntityNotFoundError, ValidationError, DuplicateEntityError
 from app.models.alerta import Encuesta, RespuestaEncuesta
 from app.models.estudiante import Estudiante, EstadoEstudiante
-from app.utils.security import decrypt_data, encrypt_data
+from app.utils.security import decrypt_data, encrypt_data, hash_data
 from app.utils.audit import AuditService
 
 
@@ -535,22 +535,18 @@ class EncuestaService:
         self, encuesta_id: str, documento: str
     ) -> dict:
         """verify a student by documento and check if they can answer.
-        documento is encrypted, so we decrypt and compare in Python."""
+        uses documento_hash index for O(log n) lookup instead of full table scan."""
         encuesta = self._get_or_raise(encuesta_id)
 
         if encuesta.estado != "PUBLICADA":
             raise ValidationError("La encuesta no esta disponible para responder")
 
-        # find student by decrypted documento
-        estudiante = None
-        all_students = self.db.query(Estudiante).all()
-        for est in all_students:
-            if not est.documento:
-                continue
-            decrypted = decrypt_data(est.documento)
-            if decrypted == documento:
-                estudiante = est
-                break
+        documento_hash = hash_data(documento)
+        estudiante = (
+            self.db.query(Estudiante)
+            .filter(Estudiante.documento_hash == documento_hash)
+            .first()
+        )
 
         if not estudiante:
             return {

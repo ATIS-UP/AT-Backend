@@ -28,6 +28,7 @@ class Estudiante(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     codigo = Column(String(20), unique=True, nullable=False, index=True)
+    documento_hash = Column(String(64), unique=True, nullable=True, index=True)
 
     # Datos encriptados con Fernet
     nombres = Column(String(255), nullable=False)  # Encriptado
