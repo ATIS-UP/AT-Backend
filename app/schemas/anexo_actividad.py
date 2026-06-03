@@ -1,6 +1,6 @@
 """Schemas para Anexos de Actividades Institucionales"""
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AnexoActividadResponse(BaseModel):
@@ -12,8 +12,7 @@ class AnexoActividadResponse(BaseModel):
     uploaded_by: str
     created_at: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AnexoActividadListResponse(BaseModel):

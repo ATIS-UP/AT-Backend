@@ -20,24 +20,6 @@ def get_service(db: Session = Depends(get_db)) -> CasoEspecialService:
     return CasoEspecialService(db)
 
 
-def get_current_user_from_request(request: Request, db: Session = Depends(get_db)) -> User:
-    from app.utils.auth import verify_token
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="No autorizado")
-    
-    token = auth_header.replace("Bearer ", "")
-    payload = verify_token(token, "access")
-    if not payload:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    
-    user = db.query(User).filter(User.id == payload.get("sub")).first()
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="Usuario inactivo")
-    
-    return user
-
-
 @router.get("/buscar-estudiante")
 async def buscar_estudiante(
     q: str = Query(..., min_length=1, description="Texto de búsqueda"),

@@ -1,6 +1,7 @@
 """service layer for survey (encuesta) management."""
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import UTC as tz_utc
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -164,7 +165,7 @@ class EncuestaService:
     def procesar_vencimientos(self) -> dict:
         """close any PUBLICADA surveys whose fecha_fin has passed.
         returns counts of surveys closed vs total processed."""
-        ahora = datetime.now(timezone.utc)
+        ahora = datetime.now(tz_utc)
 
         candidatas = (
             self.db.query(Encuesta)
@@ -328,7 +329,7 @@ class EncuestaService:
             )
 
         encuesta.estado = "PUBLICADA"
-        encuesta.fecha_inicio = datetime.now(timezone.utc)
+        encuesta.fecha_inicio = datetime.now(tz_utc)
 
         self.db.commit()
         self.db.refresh(encuesta)
@@ -354,7 +355,7 @@ class EncuestaService:
             )
 
         encuesta.estado = "CERRADA"
-        encuesta.fecha_fin = datetime.now(timezone.utc)
+        encuesta.fecha_fin = datetime.now(tz_utc)
 
         self.db.commit()
         self.db.refresh(encuesta)

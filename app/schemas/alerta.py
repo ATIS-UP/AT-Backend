@@ -1,7 +1,8 @@
 """Schemas de alertas y actividades"""
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 # Alertas
@@ -46,8 +47,7 @@ class AlertaResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AlertaListResponse(BaseModel):
@@ -101,8 +101,7 @@ class ActividadResponse(BaseModel):
     completada: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Artefactos
@@ -116,18 +115,3 @@ class ArtefactoBase(BaseModel):
 class ArtefactoCreate(ArtefactoBase):
     alerta_id: Optional[str] = None
     estudiante_id: Optional[str] = None
-
-
-class ArtefactoResponse(BaseModel):
-    id: str
-    alerta_id: Optional[str]
-    estudiante_id: Optional[str]
-    nombre: str
-    tipo: str
-    url: str
-    descripcion: Optional[str]
-    uploaded_by: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True

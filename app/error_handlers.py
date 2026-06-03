@@ -2,7 +2,8 @@
 
 import logging
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import UTC as tz_utc
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
@@ -25,7 +26,7 @@ def _build_error_response(
         "error_code": error_code,
         "status_code": status_code,
         "details": details,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(tz_utc).isoformat(),
     }
     return JSONResponse(status_code=status_code, content=body)
 

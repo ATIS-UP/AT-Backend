@@ -1,7 +1,7 @@
 """Schemas para Novedades de Casos Especiales"""
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class NovedadCasoCreate(BaseModel):
@@ -27,5 +27,4 @@ class NovedadCasoResponse(BaseModel):
     orden: int
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
