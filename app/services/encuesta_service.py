@@ -8,8 +8,42 @@ from sqlalchemy.orm import Session
 from app.exceptions import EntityNotFoundError, ValidationError, DuplicateEntityError
 from app.models.alerta import Encuesta, RespuestaEncuesta
 from app.models.estudiante import Estudiante, EstadoEstudiante
-from app.utils.security import decrypt_data
+from app.utils.security import decrypt_data, encrypt_data
 from app.utils.audit import AuditService
+
+
+CAMPO_ATTR_MAP = {
+    "email": ("email", True),
+    "telefono": ("telefono", True),
+    "programa": ("programa", False),
+    "semestre": ("semestre", False),
+    "estrato": ("estrato", False),
+    "procedencia": ("procedencia", False),
+    "genero": ("genero", False),
+    "ingreso_familiar": ("ingreso_familiar", False),
+}
+
+CAMPO_VALIDACION = {
+    "estrato": lambda v: 1 <= int(v) <= 6,
+    "genero": lambda v: str(v) in ("H", "M", "OTRO"),
+    "procedencia": lambda v: str(v) in ("LOCAL", "FORANEO"),
+    "semestre": lambda v: 1 <= int(v) <= 12,
+    "email": lambda v: "@" in str(v) and len(str(v)) <= 255,
+    "telefono": lambda v: str(v).isdigit() and 7 <= len(str(v)) <= 15,
+    "ingreso_familiar": lambda v: int(v) > 0,
+    "programa": lambda v: len(str(v)) <= 255,
+}
+
+CAMPO_ERROR_MSG = {
+    "estrato": "Debe seleccionar un estrato válido (1 a 6)",
+    "genero": "Debe seleccionar un género válido (H, M u OTRO)",
+    "procedencia": "Debe seleccionar una procedencia válida (LOCAL o FORANEO)",
+    "semestre": "Semestre debe ser un número entre 1 y 12",
+    "email": "El correo electrónico no es válido",
+    "telefono": "El teléfono solo debe contener dígitos (7 a 15 caracteres)",
+    "ingreso_familiar": "El ingreso familiar debe ser un número entero positivo",
+    "programa": "El programa académico excede la longitud máxima",
+}
 
 
 class EncuestaService:
@@ -234,6 +268,48 @@ class EncuestaService:
         )
 
         return self._to_dict(clon)
+
+    def crear_plantilla_datos(self, usuario_id: str) -> dict:
+        preguntas = [
+            {"id": 1, "texto": "Estrato socioeconómico", "tipo": "opcion_multiple",
+             "opciones": ["1", "2", "3", "4", "5", "6"], "requerida": True, "campo": "estrato", "editable": True},
+            {"id": 2, "texto": "Género", "tipo": "opcion_multiple",
+             "opciones": ["H", "M", "OTRO"], "requerida": True, "campo": "genero", "editable": True},
+            {"id": 3, "texto": "Procedencia", "tipo": "opcion_multiple",
+             "opciones": ["LOCAL", "FORANEO"], "requerida": True, "campo": "procedencia", "editable": True},
+            {"id": 4, "texto": "Ingreso familiar mensual ($)", "tipo": "texto_libre",
+             "requerida": False, "campo": "ingreso_familiar", "editable": True},
+            {"id": 5, "texto": "Correo electrónico", "tipo": "texto_libre",
+             "requerida": False, "campo": "email", "editable": True},
+            {"id": 6, "texto": "Teléfono de contacto", "tipo": "texto_libre",
+             "requerida": False, "campo": "telefono", "editable": True},
+            {"id": 7, "texto": "Programa académico", "tipo": "texto_libre",
+             "requerida": True, "campo": "programa", "editable": False},
+            {"id": 8, "texto": "Semestre actual", "tipo": "opcion_multiple",
+             "opciones": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+             "requerida": True, "campo": "semestre", "editable": False},
+        ]
+        encuesta = Encuesta(
+            id=uuid.uuid4(),
+            titulo="Actualización de Datos Estudiantiles",
+            descripcion="Completa o actualiza tus datos personales y académicos para mantener la información al día.",
+            preguntas=preguntas,
+            estado="BORRADOR",
+            periodo=None,
+        )
+        self.db.add(encuesta)
+        self.db.commit()
+        self.db.refresh(encuesta)
+
+        AuditService.log_crear(
+            db=self.db,
+            usuario_id=usuario_id,
+            entidad="Encuesta",
+            entidad_id=str(encuesta.id),
+            datos={"titulo": encuesta.titulo, "num_preguntas": len(preguntas), "es_plantilla": True},
+        )
+
+        return self._to_dict(encuesta)
 
     def publicar(self, encuesta_id: str, usuario_id: str) -> dict:
         """publish a survey: transition from BORRADOR to PUBLICADA.
@@ -513,13 +589,19 @@ class EncuestaService:
             "puede_responder": existing is None and estudiante.estado == EstadoEstudiante.ACTIVO,
             "estudiante_nombre": estudiante_nombre,
             "estudiante_id": str(estudiante.id),
+            "preguntas": (
+                self._preparar_preguntas_con_datos(encuesta, estudiante)
+                if existing is None and estudiante.estado == EstadoEstudiante.ACTIVO
+                else None
+            ),
         }
 
     def responder_publico(
         self, encuesta_id: str, documento: str, respuestas: list
     ) -> dict:
         """submit survey answers as a public student (no auth token needed).
-        verifies documento matches a registered student."""
+        verifies documento matches a registered student, saves response, and
+        updates estudiante fields from mapped questions."""
         verificado = self.verificar_estudiante(encuesta_id, documento)
         if not verificado["puede_responder"]:
             if not verificado["existe"]:
@@ -529,8 +611,23 @@ class EncuestaService:
             raise ValidationError("No puedes responder esta encuesta")
 
         estudiante_id = verificado["estudiante_id"]
-        # reuse existing registration logic
-        return self.registrar_respuesta(encuesta_id, estudiante_id, respuestas)
+        encuesta = self._get_or_raise(encuesta_id)
+        estudiante = (
+            self.db.query(Estudiante)
+            .filter(Estudiante.id == estudiante_id)
+            .first()
+        )
+
+        # validate campo values BEFORE saving response (prevents lockout on bad data)
+        self._validar_respuestas_campo(encuesta, respuestas)
+
+        result = self.registrar_respuesta(encuesta_id, estudiante_id, respuestas)
+        self._actualizar_estudiante_desde_respuestas(
+            estudiante, encuesta, respuestas
+        )
+        self.db.commit()
+
+        return result
 
     # -- private helpers --
 
@@ -571,6 +668,104 @@ class EncuestaService:
                         f"La pregunta en posicion {i} de tipo opcion_multiple "
                         "debe tener al menos 2 opciones"
                     )
+
+    def _resolver_campo(self, estudiante: Estudiante, campo: str) -> str | None:
+        if campo not in CAMPO_ATTR_MAP:
+            return None
+        attr, encrypted = CAMPO_ATTR_MAP[campo]
+        valor = getattr(estudiante, attr, None)
+        if valor is None:
+            return None
+        if encrypted:
+            return decrypt_data(valor)
+        return str(valor)
+
+    def _enmascarar_valor(self, campo: str, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        if campo == "email" and "@" in valor:
+            local, domain = valor.split("@", 1)
+            visible = local[:4] if len(local) >= 4 else local[:1]
+            tld = domain.rsplit(".", 1)[-1] if "." in domain else ""
+            return f"{visible}****@****.{tld}" if tld else f"{visible}****@****"
+        if campo == "telefono":
+            visible = valor[-4:] if len(valor) >= 4 else valor
+            return f"****{visible}"
+        return valor
+
+    def _preparar_preguntas_con_datos(
+        self, encuesta: Encuesta, estudiante: Estudiante
+    ) -> list[dict]:
+        result = []
+        for p in (encuesta.preguntas or []):
+            p_out = dict(p)
+            campo = p_out.get("campo")
+            if campo:
+                valor = self._resolver_campo(estudiante, campo)
+                p_out["valor_actual"] = self._enmascarar_valor(campo, valor)
+            else:
+                p_out["valor_actual"] = None
+            result.append(p_out)
+        return result
+
+    def _validar_respuestas_campo(
+        self, encuesta: Encuesta, respuestas: list[dict]
+    ) -> None:
+        preguntas = {p.get("id"): p for p in (encuesta.preguntas or [])}
+        for r in respuestas:
+            pid = r.get("pregunta_id")
+            pregunta = preguntas.get(pid, {})
+            campo = pregunta.get("campo")
+            editable = pregunta.get("editable", True)
+            valor_nuevo = r.get("valor")
+            if not campo or not editable:
+                continue
+            if valor_nuevo is None or (
+                isinstance(valor_nuevo, str) and not valor_nuevo.strip()
+            ):
+                continue
+            if campo in CAMPO_VALIDACION:
+                try:
+                    if not CAMPO_VALIDACION[campo](valor_nuevo):
+                        msg = CAMPO_ERROR_MSG.get(campo, f"Valor inválido para el campo '{campo}'")
+                        raise ValidationError(msg)
+                except (TypeError, ValueError):
+                    msg = CAMPO_ERROR_MSG.get(campo, f"Valor inválido para el campo '{campo}'")
+                    raise ValidationError(msg)
+
+    def _actualizar_estudiante_desde_respuestas(
+        self, estudiante: Estudiante, encuesta: Encuesta, respuestas: list[dict]
+    ) -> None:
+        preguntas = {p.get("id"): p for p in (encuesta.preguntas or [])}
+        for r in respuestas:
+            pid = r.get("pregunta_id")
+            pregunta = preguntas.get(pid, {})
+            campo = pregunta.get("campo")
+            editable = pregunta.get("editable", True)
+            valor_nuevo = r.get("valor")
+            if not campo or not editable:
+                continue
+            if valor_nuevo is None or (
+                isinstance(valor_nuevo, str) and not valor_nuevo.strip()
+            ):
+                continue
+            if campo in CAMPO_VALIDACION:
+                try:
+                    if not CAMPO_VALIDACION[campo](valor_nuevo):
+                        msg = CAMPO_ERROR_MSG.get(campo, f"Valor inválido para el campo '{campo}'")
+                        raise ValidationError(msg)
+                except (TypeError, ValueError):
+                    msg = CAMPO_ERROR_MSG.get(campo, f"Valor inválido para el campo '{campo}'")
+                    raise ValidationError(msg)
+            attr, encrypted = CAMPO_ATTR_MAP.get(campo, (None, False))
+            if not attr:
+                continue
+            if encrypted:
+                setattr(estudiante, attr, encrypt_data(str(valor_nuevo)))
+            elif campo in ("estrato", "semestre", "ingreso_familiar"):
+                setattr(estudiante, attr, int(valor_nuevo))
+            else:
+                setattr(estudiante, attr, str(valor_nuevo))
 
     def _to_dict(self, encuesta: Encuesta) -> dict:
         """convert encuesta model to dictionary."""

@@ -2,6 +2,7 @@
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel
+from pydantic import ConfigDict
 
 
 class EstudianteInfo(BaseModel):
@@ -14,8 +15,7 @@ class EstudianteInfo(BaseModel):
     semestre: int
     estado: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RegistroCasoCreate(BaseModel):
@@ -37,8 +37,7 @@ class NovedadInfo(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RegistroCasoResponse(BaseModel):
@@ -55,8 +54,7 @@ class RegistroCasoResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RegistroCasoListResponse(BaseModel):
@@ -86,8 +84,7 @@ class HistorialResponse(BaseModel):
     responsable_nombre: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class HistorialListResponse(BaseModel):

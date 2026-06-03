@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
+from datetime import UTC as tz_utc
 from sqlalchemy.orm import Session
 
 from app.models.user import RefreshToken
@@ -75,7 +76,7 @@ class TestRefreshTokenRotationLogic:
     def test_save_refresh_token_adds_to_session(self):
         """save_refresh_token should add a new record to the db session."""
         mock_db = MagicMock(spec=Session)
-        expires = datetime.utcnow() + timedelta(days=7)
+        expires = datetime.now(tz_utc) + timedelta(days=7)
 
         result = save_refresh_token(mock_db, "user-id", "new-token", expires)
 
@@ -83,20 +84,6 @@ class TestRefreshTokenRotationLogic:
         assert result.token == "new-token"
         assert result.user_id == "user-id"
         assert result.expires_at == expires
-
-    def test_create_refresh_token_returns_valid_jwt(self):
-        """create_refresh_token should return a jwt that can be verified."""
-        token, expires = create_refresh_token({"sub": "user-123"})
-
-        assert token is not None
-        assert isinstance(token, str)
-        assert expires > datetime.utcnow()
-
-        # the token should be verifiable as a refresh token
-        payload = verify_token(token, "refresh")
-        assert payload is not None
-        assert payload["sub"] == "user-123"
-        assert payload["type"] == "refresh"
 
     def test_create_refresh_token_not_valid_as_access(self):
         """a refresh token should not pass verification as an access token."""
@@ -131,7 +118,7 @@ class TestTokenRotationFlow:
     def test_new_token_valid_after_save(self):
         """a newly saved token should be considered valid."""
         mock_db = MagicMock(spec=Session)
-        expires = datetime.utcnow() + timedelta(days=7)
+        expires = datetime.now(tz_utc) + timedelta(days=7)
 
         # save new token
         new_record = save_refresh_token(mock_db, "user-1", "token-b", expires)

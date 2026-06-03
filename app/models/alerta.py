@@ -94,7 +94,7 @@ class Encuesta(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Relaciones
-    respuestas = relationship("RespuestaEncuesta", back_populates="encuesta")
+    respuestas = relationship("RespuestaEncuesta", back_populates="encuesta", cascade="all, delete-orphan")
 
 
 class RespuestaEncuesta(Base):

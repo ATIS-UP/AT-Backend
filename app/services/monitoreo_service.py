@@ -22,7 +22,7 @@ class MonitoreoService:
         return {
             "periodo": periodo or "global",
             "total_estudiantes": total_estudiantes,
-            "ingreso_familiar_promedio": 0,
+            "ingreso_familiar_promedio": self._avg_ingreso(),
             "porcentaje_ciencias_exactas": pct_exactas,
             "materias": materias,
             "total_menciones": total_menciones,
@@ -37,6 +37,14 @@ class MonitoreoService:
                 .distinct()
             )
         return q.count()
+
+    def _avg_ingreso(self) -> int:
+        result = (
+            self.db.query(func.avg(Estudiante.ingreso_familiar))
+            .filter(Estudiante.ingreso_familiar.isnot(None))
+            .scalar()
+        )
+        return int(result) if result else 0
 
     def _failed_subjects(self, periodo: Optional[str] = None) -> list[dict]:
         estados_fallo = {EstadoInscripcion.REPROBADO, EstadoInscripcion.CANCELADO}

@@ -1,5 +1,6 @@
 """router for authentication"""
 from datetime import datetime
+from datetime import UTC as tz_utc
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -48,7 +49,7 @@ async def login(
         )
 
     # Verificar si la cuenta está bloqueada
-    if user.locked_until and user.locked_until > datetime.utcnow():
+    if user.locked_until and user.locked_until > datetime.now(tz_utc):
         raise HTTPException(
             status_code=status.HTTP_423_LOCKED,
             detail="Cuenta bloqueada. Intente más tarde."
@@ -62,7 +63,7 @@ async def login(
         # Bloquear después de X intentos
         if user.failed_login_attempts >= 5:
             from datetime import timedelta
-            user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+            user.locked_until = datetime.now(tz_utc) + timedelta(minutes=15)
             db.commit()
             AuditService.log_login(db, str(user.id), login_data.email, False, request.client.host)
             raise HTTPException(
@@ -80,7 +81,7 @@ async def login(
     # Login exitoso - resetear contadores
     user.failed_login_attempts = 0
     user.locked_until = None
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(tz_utc)
     db.commit()
 
     # Crear tokens

@@ -1,5 +1,6 @@
 """Schemas de autenticación"""
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel
+from pydantic import ConfigDict, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -49,8 +50,7 @@ class UserResponse(BaseModel):
     last_login: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # User create (admin)

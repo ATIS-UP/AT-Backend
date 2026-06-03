@@ -166,6 +166,17 @@ async def duplicar_encuesta(
     return service.duplicar(encuesta_id, str(current_user.id))
 
 
+@router.post("/plantilla-datos", response_model=EncuestaResponse, status_code=status.HTTP_201_CREATED)
+async def crear_encuesta_plantilla_datos(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """create a pre-configured data update survey template with student fields mapped."""
+    service = EncuestaService(db)
+    return service.crear_plantilla_datos(str(current_user.id))
+
+
 @router.post("/{encuesta_id}/cerrar", response_model=EncuestaResponse)
 async def cerrar_encuesta(
     encuesta_id: str,

@@ -1,5 +1,6 @@
 """jwt authentication utilities"""
 from datetime import datetime, timedelta
+from datetime import UTC as tz_utc
 from typing import Optional
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -11,10 +12,11 @@ from app.models.user import RefreshToken
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """create a jwt access token"""
     to_encode = data.copy()
+    now = datetime.now(tz_utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = now + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
@@ -23,7 +25,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def create_refresh_token(data: dict) -> tuple[str, datetime]:
     """create a jwt refresh token"""
-    expires = datetime.utcnow() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+    expires = datetime.now(tz_utc) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = data.copy()
     to_encode.update({"exp": expires, "type": "refresh"})
 
@@ -78,7 +80,7 @@ def is_refresh_token_valid(db: Session, token: str, user_id: str) -> bool:
         RefreshToken.token == token,
         RefreshToken.user_id == user_id,
         RefreshToken.is_revoked == False,
-        RefreshToken.expires_at > datetime.utcnow()
+        RefreshToken.expires_at > datetime.now(tz_utc)
     ).first()
     return refresh is not None
 

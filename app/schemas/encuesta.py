@@ -10,6 +10,8 @@ class PreguntaEncuesta(BaseModel):
     tipo: str  # opcion_multiple, texto_libre, escala_likert, ABIERTA
     opciones: Optional[list[str]] = None
     requerida: bool = True
+    campo: Optional[str] = None
+    editable: bool = True
 
 
 class EncuestaCreate(BaseModel):
@@ -87,6 +89,7 @@ class VerificarEstudianteResponse(BaseModel):
     puede_responder: bool = False
     estudiante_nombre: Optional[str] = None
     estudiante_id: Optional[str] = None
+    preguntas: Optional[list[dict]] = None
 
 
 class ResponderEncuestaPublica(BaseModel):

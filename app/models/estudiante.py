@@ -47,6 +47,7 @@ class Estudiante(Base):
     estrato = Column(Integer, nullable=True)          # 1-6
     procedencia = Column(String(20), nullable=True)   # LOCAL | FORANEO
     genero = Column(String(10), nullable=True)        # H | M | OTRO
+    ingreso_familiar = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
