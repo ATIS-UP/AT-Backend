@@ -318,6 +318,14 @@ class AlertaService:
         alerta = self.db.query(Alerta).filter(Alerta.id == alerta_id).first()
         if not alerta:
             raise EntityNotFoundError("Alerta", alerta_id)
+        if alerta.estado_seguimiento in (
+            EstadoSeguimiento.RESUELTO,
+            EstadoSeguimiento.DESCARTADO,
+        ):
+            raise ValidationError(
+                f"No se pueden registrar actividades en alertas "
+                f"con estado {alerta.estado_seguimiento.value}"
+            )
 
         _tipo_labels = {
             "LLAMADA": "Llamada telefónica",

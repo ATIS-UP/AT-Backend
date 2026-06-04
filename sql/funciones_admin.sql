@@ -105,26 +105,28 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION get_db_stats() RETURNS TABLE(tabla text, filas bigint) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 'permisos'::text, COUNT(*)::bigint FROM permisos
-    UNION ALL SELECT 'rol_permisos', COUNT(*) FROM rol_permisos
-    UNION ALL SELECT 'user_permisos', COUNT(*) FROM user_permisos
-    UNION ALL SELECT 'users', COUNT(*) FROM users
-    UNION ALL SELECT 'refresh_tokens', COUNT(*) FROM refresh_tokens
-    UNION ALL SELECT 'parametrizacion', COUNT(*) FROM parametrizacion
-    UNION ALL SELECT 'novedades_casos', COUNT(*) FROM novedades_casos
-    UNION ALL SELECT 'encuestas', COUNT(*) FROM encuestas
-    UNION ALL SELECT 'respuestas_encuestas', COUNT(*) FROM respuestas_encuestas
-    UNION ALL SELECT 'estudiantes', COUNT(*) FROM estudiantes
-    UNION ALL SELECT 'alertas', COUNT(*) FROM alertas
-    UNION ALL SELECT 'actividades', COUNT(*) FROM actividades
-    UNION ALL SELECT 'registros_casos_especiales', COUNT(*) FROM registros_casos_especiales
-    UNION ALL SELECT 'historial_registros', COUNT(*) FROM historial_registros
-    UNION ALL SELECT 'actividades_institucionales', COUNT(*) FROM actividades_institucionales
-    UNION ALL SELECT 'anexos_actividades', COUNT(*) FROM anexos_actividades
-    UNION ALL SELECT 'artefactos', COUNT(*) FROM artefactos
-    UNION ALL SELECT 'bienestar_registros', COUNT(*) FROM bienestar_registros
-    UNION ALL SELECT 'auditoria', COUNT(*) FROM auditoria
-    ORDER BY tabla;
+    SELECT * FROM (
+        SELECT 'permisos'::text, COUNT(*)::bigint FROM permisos
+        UNION ALL SELECT 'rol_permisos', COUNT(*) FROM rol_permisos
+        UNION ALL SELECT 'user_permisos', COUNT(*) FROM user_permisos
+        UNION ALL SELECT 'users', COUNT(*) FROM users
+        UNION ALL SELECT 'refresh_tokens', COUNT(*) FROM refresh_tokens
+        UNION ALL SELECT 'parametrizacion', COUNT(*) FROM parametrizacion
+        UNION ALL SELECT 'novedades_casos', COUNT(*) FROM novedades_casos
+        UNION ALL SELECT 'encuestas', COUNT(*) FROM encuestas
+        UNION ALL SELECT 'respuestas_encuestas', COUNT(*) FROM respuestas_encuestas
+        UNION ALL SELECT 'estudiantes', COUNT(*) FROM estudiantes
+        UNION ALL SELECT 'alertas', COUNT(*) FROM alertas
+        UNION ALL SELECT 'actividades', COUNT(*) FROM actividades
+        UNION ALL SELECT 'registros_casos_especiales', COUNT(*) FROM registros_casos_especiales
+        UNION ALL SELECT 'historial_registros', COUNT(*) FROM historial_registros
+        UNION ALL SELECT 'actividades_institucionales', COUNT(*) FROM actividades_institucionales
+        UNION ALL SELECT 'anexos_actividades', COUNT(*) FROM anexos_actividades
+        UNION ALL SELECT 'artefactos', COUNT(*) FROM artefactos
+        UNION ALL SELECT 'bienestar_registros', COUNT(*) FROM bienestar_registros
+        UNION ALL SELECT 'auditoria', COUNT(*) FROM auditoria
+    ) stats
+    ORDER BY 1;
 END;
 $$ LANGUAGE plpgsql;
 
