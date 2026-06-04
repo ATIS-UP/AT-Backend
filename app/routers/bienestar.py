@@ -47,6 +47,6 @@ async def descargar_plantilla(
     csv_bytes = BienestarService(db).generar_plantilla_csv()
     return Response(
         content=csv_bytes,
-        media_type="text/csv",
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=plantilla_bienestar_tcbu.csv"},
     )

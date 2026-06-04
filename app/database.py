@@ -6,6 +6,7 @@ from app.config import settings
 
 engine = create_engine(
     settings.DATABASE_URL,
+    connect_args={"client_encoding": "utf8"},
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

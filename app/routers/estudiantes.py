@@ -53,7 +53,7 @@ async def descargar_plantilla(
     writer.writerow(example_row)
     return Response(
         content=buf.getvalue().encode("utf-8-sig"),
-        media_type="text/csv",
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=plantilla_estudiantes.csv"},
     )
 
