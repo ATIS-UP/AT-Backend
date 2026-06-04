@@ -175,16 +175,19 @@ class CasoEspecialService:
         
         old_estado = registro.estado.value if hasattr(registro.estado, 'value') else str(registro.estado)
 
+        if registro.estado == EstadoRegistroCaso.CERRADO:
+            if not data.estado or data.estado == old_estado:
+                raise ValidationError("No se puede modificar un caso cerrado. Debe reabrirlo primero.")
+
         if data.estado:
             if data.estado == old_estado:
                 raise ValidationError(
                     f"El registro ya se encuentra en estado {old_estado}"
                 )
+            registro.estado = EstadoRegistroCaso(data.estado)
 
         if data.tipo:
             registro.tipo = TipoRegistroCaso(data.tipo)
-        if data.estado:
-            registro.estado = EstadoRegistroCaso(data.estado)
         if data.novedad_id is not None:
             novedad = self.db.query(NovedadCaso).filter(NovedadCaso.id == UUID(data.novedad_id)).first()
             if not novedad:
@@ -231,7 +234,7 @@ class CasoEspecialService:
 
         historial = HistorialRegistro(
             registro_id=registro.id,
-            accion=accion.upper(),
+            accion=AccionHistorial.SEGUIMIENTO.value,
             observaciones=observaciones,
             responsable_id=UUID(usuario_id),
             responsable_nombre=usuario_nombre

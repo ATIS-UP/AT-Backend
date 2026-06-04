@@ -40,6 +40,36 @@ async def list_estudiantes(
     )
 
 
+@router.get("/plantilla-csv")
+async def descargar_plantilla(
+    current_user: User = Depends(require_permiso("crear_estudiante")),
+):
+    """Download a CSV template for bulk student upload."""
+    headers_row = ["nombres", "apellidos", "documento", "telefono", "email", "programa", "semestre", "estado"]
+    example_row = ["María", "González Pérez", "1098765432", "3001234567", "mgonzalez@unipamplona.edu.co", "Ingeniería de Sistemas", "3", "ACTIVO"]
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(headers_row)
+    writer.writerow(example_row)
+    return Response(
+        content=buf.getvalue().encode("utf-8-sig"),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=plantilla_estudiantes.csv"},
+    )
+
+
+@router.post("/carga-masiva", response_model=CargaMasivaResumen)
+async def carga_masiva(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permiso("crear_estudiante")),
+):
+    """bulk upload students from csv/xlsx file"""
+    service = CargaMasivaService(db)
+    return service.procesar_archivo(file, str(current_user.id), request.client.host)
+
+
 @router.get("/{estudiante_id}", response_model=EstudianteResponse)
 async def get_estudiante(
     estudiante_id: str,
@@ -129,33 +159,3 @@ async def update_estudiante_estado(
     return service.cambiar_estado(
         estudiante_id, estado_data.estado, str(current_user.id), request.client.host
     )
-
-
-@router.get("/plantilla-csv")
-async def descargar_plantilla(
-    current_user: User = Depends(require_permiso("crear_estudiante")),
-):
-    """Download a CSV template for bulk student upload."""
-    headers_row = ["codigo", "nombres", "apellidos", "documento", "telefono", "email", "programa", "semestre", "estado"]
-    example_row = ["20261001", "María", "González Pérez", "1098765432", "3001234567", "mgonzalez@unipamplona.edu.co", "Ingeniería de Sistemas", "3", "ACTIVO"]
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(headers_row)
-    writer.writerow(example_row)
-    return Response(
-        content=buf.getvalue().encode("utf-8-sig"),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=plantilla_estudiantes.csv"},
-    )
-
-
-@router.post("/carga-masiva", response_model=CargaMasivaResumen)
-async def carga_masiva(
-    request: Request,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_permiso("crear_estudiante")),
-):
-    """bulk upload students from csv/xlsx file"""
-    service = CargaMasivaService(db)
-    return service.procesar_archivo(file, str(current_user.id), request.client.host)

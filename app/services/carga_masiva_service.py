@@ -14,7 +14,7 @@ from app.utils.security import encrypt_data
 from app.utils.audit import AuditService
 
 # required columns that must be present in the uploaded file
-REQUIRED_COLUMNS = {"codigo", "nombres", "apellidos", "programa", "semestre"}
+REQUIRED_COLUMNS = {"nombres", "apellidos", "programa", "semestre", "documento"}
 
 # valid file extensions
 ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
@@ -200,17 +200,6 @@ class CargaMasivaService:
         """validate a single row, return list of error dicts (empty if valid)"""
         errors = []
 
-        # codigo: required, max 20 chars
-        codigo = row.get("codigo", "").strip()
-        if not codigo:
-            errors.append(
-                {"fila": row_number, "campo": "codigo", "error": "campo requerido"}
-            )
-        elif len(codigo) > 20:
-            errors.append(
-                {"fila": row_number, "campo": "codigo", "error": "máximo 20 caracteres"}
-            )
-
         # nombres: required
         nombres = row.get("nombres", "").strip()
         if not nombres:
@@ -269,6 +258,25 @@ class CargaMasivaService:
                 }
             )
 
+        # documento: required, digits only, 5-15 chars
+        documento = row.get("documento", "").strip()
+        if not documento:
+            errors.append(
+                {"fila": row_number, "campo": "documento", "error": "campo requerido"}
+            )
+        elif not documento.isdigit():
+            errors.append(
+                {"fila": row_number, "campo": "documento", "error": "solo números"}
+            )
+        elif len(documento) < 5:
+            errors.append(
+                {"fila": row_number, "campo": "documento", "error": "mínimo 5 caracteres"}
+            )
+        elif len(documento) > 15:
+            errors.append(
+                {"fila": row_number, "campo": "documento", "error": "máximo 15 caracteres"}
+            )
+
         return errors
 
     def _upsert_student(
@@ -278,7 +286,8 @@ class CargaMasivaService:
 
         returns True if updated, False if inserted.
         """
-        codigo = row["codigo"].strip()
+        documento = row.get("documento", "").strip()
+        codigo = row.get("codigo", documento).strip()
         existing = (
             self.db.query(Estudiante)
             .filter(Estudiante.codigo == codigo)
@@ -291,7 +300,6 @@ class CargaMasivaService:
         semestre = int(row.get("semestre", "1").strip())
         estado_str = row.get("estado", "").strip().upper() or "ACTIVO"
         email = row.get("email", "").strip() or None
-        documento = row.get("documento", "").strip() or None
         telefono = row.get("telefono", "").strip() or None
         estado = EstadoEstudiante(estado_str)
 
