@@ -229,16 +229,16 @@ def seed_plantilla_encuesta(conn):
     admin = conn.execute(text("SELECT id FROM users WHERE email = 'admin@unipamplona.edu.co'")).fetchone()
     admin_id = str(admin[0]) if admin else None
 
-    conn.execute(text("""
+    preguntas_json = str(PLANTILLA_PREGUNTAS)
+    conn.execute(text(f"""
         INSERT INTO encuestas (id, titulo, descripcion, preguntas, estado, periodo, es_publica)
-        SELECT gen_random_uuid(), :titulo, :descripcion, :preguntas::jsonb, 'BORRADOR', NULL, false
+        SELECT gen_random_uuid(), :titulo, :descripcion, '{preguntas_json}'::jsonb, 'BORRADOR', NULL, false
         WHERE NOT EXISTS (
             SELECT 1 FROM encuestas WHERE titulo = :titulo AND estado = 'BORRADOR'
         )
     """), {
         "titulo": "ActualizaciÃ³n de Datos Estudiantiles",
         "descripcion": "Completa o actualiza tus datos personales y acadÃ©micos para mantener la informaciÃ³n al dÃ­a.",
-        "preguntas": str(PLANTILLA_PREGUNTAS),
     })
 
     if admin_id:
@@ -246,16 +246,16 @@ def seed_plantilla_encuesta(conn):
             "SELECT id FROM encuestas WHERE titulo = 'ActualizaciÃ³n de Datos Estudiantiles' AND estado = 'BORRADOR'"
         )).fetchone()
         if encuesta:
-            conn.execute(text("""
+            conn.execute(text(f"""
                 INSERT INTO auditoria (id, usuario_id, accion, entidad, entidad_id, detalles, estado)
-                SELECT gen_random_uuid(), :usuario_id, 'CREAR', 'Encuesta', :entidad_id, :detalles::jsonb, 'EXITOSO'
+                SELECT gen_random_uuid(), :usuario_id, 'CREAR', 'Encuesta', :entidad_id,
+                    '{{"titulo": "ActualizaciÃ³n de Datos Estudiantiles", "num_preguntas": 8, "es_plantilla": true}}'::jsonb, 'EXITOSO'
                 WHERE NOT EXISTS (
                     SELECT 1 FROM auditoria WHERE entidad_id = :entidad_id2 AND accion = 'CREAR'
                 )
             """), {
                 "usuario_id": admin_id,
                 "entidad_id": str(encuesta[0]),
-                "detalles": '{"titulo": "ActualizaciÃ³n de Datos Estudiantiles", "num_preguntas": 8, "es_plantilla": true}',
                 "entidad_id2": str(encuesta[0]),
             })
 
