@@ -10,7 +10,7 @@ class AlertaBase(BaseModel):
     estudiante_id: str
     materia_id: Optional[str] = None
     nivel_riesgo: str  # ROJO, AMARILLO, VERDE
-    descripcion: Optional[str] = None
+    descripcion: str
     periodo: str  # 2025-1
 
 

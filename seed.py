@@ -304,6 +304,9 @@ NOVEDADES_POR_TIPO = {
         ("Inconformidad con la carrera", "Dudas sobre la elección profesional o falta de motivación con el plan de estudios."),
         ("Desconocimiento de servicios", "Estudiantes que requieren orientación sobre becas, subsidios o apoyos institucionales y no saben cómo acceder a ellos."),
     ],
+    "OTRO": [
+        ("Otra", None),
+    ],
 }
 
 
