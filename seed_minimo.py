@@ -1,5 +1,6 @@
 """Seed mÃ­nimo: purga BD y crea solo datos esenciales para operar"""
 import uuid
+import json
 from datetime import datetime
 from sqlalchemy import text
 from app.database import engine
@@ -229,7 +230,7 @@ def seed_plantilla_encuesta(conn):
     admin = conn.execute(text("SELECT id FROM users WHERE email = 'admin@unipamplona.edu.co'")).fetchone()
     admin_id = str(admin[0]) if admin else None
 
-    preguntas_json = str(PLANTILLA_PREGUNTAS)
+    preguntas_json = json.dumps(PLANTILLA_PREGUNTAS, ensure_ascii=False)
     conn.execute(text(f"""
         INSERT INTO encuestas (id, titulo, descripcion, preguntas, estado, periodo, es_publica)
         SELECT gen_random_uuid(), :titulo, :descripcion, '{preguntas_json}'::jsonb, 'BORRADOR', NULL, false
