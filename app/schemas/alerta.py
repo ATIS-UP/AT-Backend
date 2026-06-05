@@ -67,6 +67,23 @@ class AlertasStats(BaseModel):
     resueltos: int
 
 
+# Historial unificado
+class HistorialEntry(BaseModel):
+    id: str
+    tipo: str  # "ACTIVIDAD" | "CAMBIO_ESTADO"
+    titulo: str
+    descripcion: Optional[str] = None
+    estado_anterior: Optional[str] = None
+    estado_nuevo: Optional[str] = None
+    tipo_actividad: Optional[str] = None
+    usuario_id: Optional[str] = None
+    responsable: Optional[str] = None
+    fecha: datetime
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Actividades
 class ActividadBase(BaseModel):
     titulo: Optional[str] = None

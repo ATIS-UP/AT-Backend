@@ -15,7 +15,9 @@ from app.schemas.alerta import (
     AlertasStats,
     ActividadCreate,
     ActividadResponse,
+    HistorialEntry,
 )
+from app.models.sistema import Auditoria
 from app.utils.security import encrypt_data, decrypt_data
 from app.utils.audit import AuditService
 
@@ -346,6 +348,10 @@ class AlertaService:
         )
 
         self.db.add(nueva)
+
+        if alerta.estado_seguimiento == EstadoSeguimiento.PENDIENTE:
+            alerta.estado_seguimiento = EstadoSeguimiento.EN_PROCESO
+
         self.db.commit()
         self.db.refresh(nueva)
 
@@ -361,3 +367,59 @@ class AlertaService:
         )
 
         return [self._actividad_to_response(a) for a in actividades]
+
+    def listar_historial(self, alerta_id: str) -> list[HistorialEntry]:
+        """unified history: activities + state changes, chronological"""
+        alerta = self.db.query(Alerta).filter(Alerta.id == alerta_id).first()
+        if not alerta:
+            raise EntityNotFoundError("Alerta", alerta_id)
+
+        entries: list[HistorialEntry] = []
+
+        actividades = (
+            self.db.query(Actividad)
+            .filter(Actividad.alerta_id == alerta_id)
+            .order_by(Actividad.fecha_actividad.asc())
+            .all()
+        )
+        for act in actividades:
+            entries.append(HistorialEntry(
+                id=str(act.id),
+                tipo="ACTIVIDAD",
+                titulo=act.titulo,
+                descripcion=act.descripcion,
+                tipo_actividad=act.tipo.value,
+                usuario_id=str(act.usuario_id),
+                fecha=act.fecha_actividad,
+                created_at=act.created_at,
+            ))
+
+        audit_entries = (
+            self.db.query(Auditoria)
+            .filter(
+                Auditoria.entidad == "Alerta",
+                Auditoria.entidad_id == alerta_id,
+                Auditoria.accion == "UPDATE"
+            )
+            .order_by(Auditoria.created_at.asc())
+            .all()
+        )
+        for entry in audit_entries:
+            if not entry.detalles:
+                continue
+            anteriores = entry.detalles.get("datos_anteriores", {})
+            nuevos = entry.detalles.get("datos_nuevos", {})
+            if "estado_seguimiento" in anteriores:
+                entries.append(HistorialEntry(
+                    id=str(entry.id),
+                    tipo="CAMBIO_ESTADO",
+                    titulo="Cambio de estado",
+                    estado_anterior=anteriores["estado_seguimiento"],
+                    estado_nuevo=nuevos.get("estado_seguimiento"),
+                    usuario_id=str(entry.usuario_id) if entry.usuario_id else None,
+                    fecha=entry.created_at,
+                    created_at=entry.created_at,
+                ))
+
+        entries.sort(key=lambda e: e.fecha)
+        return entries

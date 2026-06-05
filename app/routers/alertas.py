@@ -8,7 +8,8 @@ from app.dependencies import require_permiso
 from app.models.user import User
 from app.schemas.alerta import (
     AlertaCreate, AlertaUpdate, AlertaResponse, AlertaListResponse,
-    AlertaEstadoUpdate, AlertasStats, ActividadCreate, ActividadResponse
+    AlertaEstadoUpdate, AlertasStats, ActividadCreate, ActividadResponse,
+    HistorialEntry
 )
 from app.services.alerta_service import AlertaService
 
@@ -125,6 +126,18 @@ async def list_actividades(
     """list activities for an alert"""
     service = AlertaService(db)
     return service.listar_actividades(alerta_id)
+
+
+@router.get("/{alerta_id}/historial", response_model=List[HistorialEntry])
+async def get_historial(
+    alerta_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permiso("ver_alertas"))
+):
+    """unified history: activities + state changes"""
+    service = AlertaService(db)
+    return service.listar_historial(alerta_id)
 
 
 @router.post("/{alerta_id}/actividades", response_model=ActividadResponse, status_code=status.HTTP_201_CREATED)
