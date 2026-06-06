@@ -29,6 +29,7 @@ class Estudiante(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     codigo = Column(String(20), unique=True, nullable=False, index=True)
     documento_hash = Column(String(64), unique=True, nullable=True, index=True)
+    email_hash = Column(String(64), unique=True, nullable=True, index=True)
 
     # Datos encriptados con Fernet
     nombres = Column(String(255), nullable=False)  # Encriptado
@@ -49,6 +50,7 @@ class Estudiante(Base):
     procedencia = Column(String(20), nullable=True)   # LOCAL | FORANEO
     genero = Column(String(10), nullable=True)        # H | M | OTRO
     ingreso_familiar = Column(Integer, nullable=True)
+    sede = Column(String(50), nullable=True)          # Pamplona | Villa del Rosario | Virtual
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

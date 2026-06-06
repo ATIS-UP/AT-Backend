@@ -22,6 +22,9 @@ ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
 # valid student states
 VALID_ESTADOS = {"ACTIVO", "INACTIVO", "GRADUADO", "SUSPENDIDO"}
 
+# valid sede options
+SEDES = {"PAMPLONA", "VILLA DEL ROSARIO", "VIRTUAL"}
+
 
 class CargaMasivaService:
     """handles bulk upload of students from csv/xlsx files"""
@@ -200,42 +203,54 @@ class CargaMasivaService:
         """validate a single row, return list of error dicts (empty if valid)"""
         errors = []
 
-        # nombres: required
+        # nombres: required, max 100
         nombres = row.get("nombres", "").strip()
         if not nombres:
             errors.append(
-                {"fila": row_number, "campo": "nombres", "error": "campo requerido"}
+                {"fila": row_number, "campo": "nombres", "error": "campo requerido. Debe contener al menos un carácter. Ej: 'María'"}
+            )
+        elif len(nombres) > 100:
+            errors.append(
+                {"fila": row_number, "campo": "nombres", "error": f"máximo 100 caracteres. Recibido: {len(nombres)} chars. Ej: 'María Fernanda'"}
             )
 
-        # apellidos: required
+        # apellidos: required, max 100
         apellidos = row.get("apellidos", "").strip()
         if not apellidos:
             errors.append(
-                {"fila": row_number, "campo": "apellidos", "error": "campo requerido"}
+                {"fila": row_number, "campo": "apellidos", "error": "campo requerido. Debe contener al menos un carácter. Ej: 'González Pérez'"}
+            )
+        elif len(apellidos) > 100:
+            errors.append(
+                {"fila": row_number, "campo": "apellidos", "error": f"máximo 100 caracteres. Recibido: {len(apellidos)} chars. Ej: 'González Pérez'"}
             )
 
-        # programa: required
+        # programa: required, max 255
         programa = row.get("programa", "").strip()
         if not programa:
             errors.append(
-                {"fila": row_number, "campo": "programa", "error": "campo requerido"}
+                {"fila": row_number, "campo": "programa", "error": "campo requerido. Ingrese el nombre del programa académico. Ej: 'Ingeniería de Sistemas', 'Trabajo Social'"}
+            )
+        elif len(programa) > 255:
+            errors.append(
+                {"fila": row_number, "campo": "programa", "error": f"máximo 255 caracteres. Recibido: {len(programa)} chars"}
             )
 
-        # semestre: required, integer between 1 and 15
+        # semestre: required, integer between 1 and 12
         semestre_str = row.get("semestre", "").strip()
         if not semestre_str:
             errors.append(
-                {"fila": row_number, "campo": "semestre", "error": "campo requerido"}
+                {"fila": row_number, "campo": "semestre", "error": "campo requerido. Ingrese un número entre 1 y 12. Ej: '3'"}
             )
         else:
             try:
                 semestre_val = int(semestre_str)
-                if semestre_val < 1 or semestre_val > 15:
+                if semestre_val < 1 or semestre_val > 12:
                     errors.append(
                         {
                             "fila": row_number,
                             "campo": "semestre",
-                            "error": "debe ser un entero entre 1 y 15",
+                            "error": f"debe ser un entero entre 1 y 12. Recibido: '{semestre_str}'. Ej: '3'",
                         }
                     )
             except ValueError:
@@ -243,7 +258,7 @@ class CargaMasivaService:
                     {
                         "fila": row_number,
                         "campo": "semestre",
-                        "error": "debe ser un entero válido",
+                        "error": f"debe ser un número entero. Recibido: '{semestre_str}'. Ej: '3'",
                     }
                 )
 
@@ -254,7 +269,7 @@ class CargaMasivaService:
                 {
                     "fila": row_number,
                     "campo": "estado",
-                    "error": f"debe ser uno de: {', '.join(sorted(VALID_ESTADOS))}",
+                    "error": f"debe ser uno de: {', '.join(sorted(VALID_ESTADOS))}. Recibido: '{estado}'. Ej: 'ACTIVO'",
                 }
             )
 
@@ -262,19 +277,68 @@ class CargaMasivaService:
         documento = row.get("documento", "").strip()
         if not documento:
             errors.append(
-                {"fila": row_number, "campo": "documento", "error": "campo requerido"}
+                {"fila": row_number, "campo": "documento", "error": "campo requerido. Debe contener entre 5 y 15 dígitos. Ej: '1098765432'"}
             )
         elif not documento.isdigit():
             errors.append(
-                {"fila": row_number, "campo": "documento", "error": "solo números"}
+                {"fila": row_number, "campo": "documento", "error": f"solo se permiten números. Recibido: '{documento}'. Ej: '1098765432'"}
             )
         elif len(documento) < 5:
             errors.append(
-                {"fila": row_number, "campo": "documento", "error": "mínimo 5 caracteres"}
+                {"fila": row_number, "campo": "documento", "error": f"mínimo 5 dígitos. Recibido: '{documento}' ({len(documento)} chars). Ej: '1098765432'"}
             )
         elif len(documento) > 15:
             errors.append(
-                {"fila": row_number, "campo": "documento", "error": "máximo 15 caracteres"}
+                {"fila": row_number, "campo": "documento", "error": f"máximo 15 dígitos. Recibido: '{documento}' ({len(documento)} chars). Ej: '1098765432'"}
+            )
+
+        # codigo: optional but must not be empty if provided
+        codigo = row.get("codigo", "").strip()
+        if codigo and not codigo.strip():
+            errors.append(
+                {"fila": row_number, "campo": "codigo", "error": "si se incluye la columna 'codigo', el valor no debe estar vacío. Ej: '12345'"}
+            )
+
+        # email: optional, validate format if provided
+        email = row.get("email", "").strip()
+        if email:
+            if "@" not in email or "." not in email.split("@")[-1]:
+                errors.append(
+                    {"fila": row_number, "campo": "email", "error": f"formato de correo inválido. Recibido: '{email}'. Ej: 'maria@unipamplona.edu.co'"}
+                )
+            elif len(email) > 255:
+                errors.append(
+                    {"fila": row_number, "campo": "email", "error": f"máximo 255 caracteres. Recibido: {len(email)} chars"}
+                )
+
+        # telefono: optional, validate digits only + 7-15 chars if provided
+        telefono = row.get("telefono", "").strip()
+        if telefono:
+            if not telefono.isdigit():
+                errors.append(
+                    {"fila": row_number, "campo": "telefono", "error": f"solo se permiten números. Recibido: '{telefono}'. Ej: '3001234567'"}
+                )
+            elif len(telefono) < 7:
+                errors.append(
+                    {"fila": row_number, "campo": "telefono", "error": f"mínimo 7 dígitos. Recibido: '{telefono}' ({len(telefono)} chars). Ej: '3001234567'"}
+                )
+            elif len(telefono) > 15:
+                errors.append(
+                    {"fila": row_number, "campo": "telefono", "error": f"máximo 15 dígitos. Recibido: '{telefono}' ({len(telefono)} chars). Ej: '3001234567'"}
+                )
+
+        # sede: optional, must be one of valid sedes if provided
+        sede = row.get("sede", "").strip().upper()
+        if sede and sede not in SEDES:
+            errors.append(
+                {"fila": row_number, "campo": "sede", "error": f"debe ser una de: {', '.join(sorted(SEDES))}. Recibido: '{sede}'. Ej: 'PAMPLONA'"}
+            )
+
+        # procedencia (ciudad origen): max 100 chars if provided
+        procedencia = row.get("procedencia", "").strip()
+        if procedencia and len(procedencia) > 100:
+            errors.append(
+                {"fila": row_number, "campo": "procedencia", "error": f"máximo 100 caracteres. Recibido: {len(procedencia)} chars"}
             )
 
         return errors
@@ -301,7 +365,16 @@ class CargaMasivaService:
         estado_str = row.get("estado", "").strip().upper() or "ACTIVO"
         email = row.get("email", "").strip() or None
         telefono = row.get("telefono", "").strip() or None
+        sede = (row.get("sede", "").strip().upper()) or None
         estado = EstadoEstudiante(estado_str)
+
+        if email:
+            email_hash = hash_data(email)
+            duplicado = self.db.query(Estudiante).filter(Estudiante.email_hash == email_hash).first()
+            if duplicado and duplicado.codigo != codigo:
+                raise ValidationError(f"El email '{email}' ya está registrado para el estudiante {duplicado.codigo}")
+        else:
+            email_hash = None
 
         if existing:
             # update existing student
@@ -312,10 +385,12 @@ class CargaMasivaService:
             existing.estado = estado
             if email:
                 existing.email = encrypt_data(email)
+                existing.email_hash = email_hash
             if documento:
                 existing.documento = encrypt_data(documento)
             if telefono:
                 existing.telefono = encrypt_data(telefono)
+            existing.sede = sede
             return True
         else:
             # insert new student
@@ -327,8 +402,10 @@ class CargaMasivaService:
                 semestre=semestre,
                 estado=estado,
                 email=encrypt_data(email) if email else None,
+                email_hash=email_hash,
                 documento=encrypt_data(documento) if documento else None,
                 telefono=encrypt_data(telefono) if telefono else None,
+                sede=sede,
             )
             self.db.add(nuevo)
             return False

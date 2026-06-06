@@ -16,6 +16,7 @@ class EstudianteBase(BaseModel):
     promedio_general: Optional[float] = None
     promedio_acumulado: Optional[float] = None
     estado: str = "ACTIVO"
+    sede: Optional[str] = None
 
 
 class EstudianteCreate(EstudianteBase):
@@ -33,6 +34,7 @@ class EstudianteUpdate(BaseModel):
     promedio_general: Optional[float] = None
     promedio_acumulado: Optional[float] = None
     estado: Optional[str] = None
+    sede: Optional[str] = None
 
 
 class EstudianteResponse(BaseModel):
@@ -48,6 +50,7 @@ class EstudianteResponse(BaseModel):
     promedio_general: Optional[float]
     promedio_acumulado: Optional[float]
     estado: str
+    sede: Optional[str]
     created_at: datetime
     updated_at: datetime
 

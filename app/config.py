@@ -1,7 +1,10 @@
 """Configuración de la aplicación"""
 from functools import lru_cache
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+_BACKEND_ROOT = str(Path(__file__).resolve().parent.parent)
 
 
 class Settings(BaseSettings):
@@ -29,6 +32,9 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_PER_MINUTE: int = 5
     LOGIN_MAX_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_MINUTES: int = 15
+
+    # Base path for file uploads (default: backend root)
+    UPLOAD_BASE_PATH: str = _BACKEND_ROOT
 
     # Storage (local or s3)
     STORAGE_BACKEND: str = "local"

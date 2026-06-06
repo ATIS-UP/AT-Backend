@@ -38,6 +38,8 @@ class EncuestaService:
         fecha_fin = data.get("fecha_fin")
         if isinstance(fecha_fin, str):
             fecha_fin = datetime.fromisoformat(fecha_fin.replace("Z", "+00:00"))
+        if fecha_fin and fecha_fin < datetime.now(tz_utc):
+            raise ValidationError("La fecha de cierre debe ser posterior a la fecha actual")
 
         encuesta = Encuesta(
             id=uuid.uuid4(), titulo=data["titulo"], descripcion=data.get("descripcion"),
@@ -146,6 +148,8 @@ class EncuestaService:
         preguntas = encuesta.preguntas or []
         if len(preguntas) < 1:
             raise ValidationError("La encuesta debe tener al menos una pregunta para ser publicada")
+        if encuesta.fecha_fin and encuesta.fecha_fin < datetime.now(tz_utc):
+            raise ValidationError("La fecha de cierre debe ser posterior a la fecha actual")
         encuesta.estado = "PUBLICADA"
         encuesta.fecha_inicio = datetime.now(tz_utc)
         self.db.commit()
@@ -214,7 +218,7 @@ class EncuestaService:
                     if val is not None:
                         answers.append(val)
             resultado = {"pregunta_id": pregunta_id, "texto": texto, "tipo": tipo, "total_respuestas": len(answers)}
-            if tipo == "opcion_multiple":
+            if tipo in ("opcion_multiple", "opcion_multiple_multi"):
                 distribucion = {}
                 for a in answers:
                     if isinstance(a, str):
@@ -257,7 +261,7 @@ class EncuestaService:
         return encuesta
 
     def _validar_preguntas(self, preguntas: list) -> None:
-        tipos_validos = {"opcion_multiple", "texto_libre", "escala_likert", "ABIERTA"}
+        tipos_validos = {"opcion_multiple", "opcion_multiple_multi", "texto_libre", "escala_likert", "ABIERTA"}
         for i, pregunta in enumerate(preguntas):
             if not isinstance(pregunta, dict):
                 raise ValidationError(f"La pregunta en posicion {i} debe ser un objeto")
@@ -269,7 +273,7 @@ class EncuestaService:
             if tipo == "opcion_multiple":
                 opciones = pregunta.get("opciones")
                 if not opciones or not isinstance(opciones, list) or len(opciones) < 2:
-                    raise ValidationError(f"La pregunta en posicion {i} de tipo opcion_multiple debe tener al menos 2 opciones")
+                    raise ValidationError(f"La pregunta en posicion {i} de tipo {tipo} debe tener al menos 2 opciones")
 
     def _to_dict(self, encuesta: Encuesta) -> dict:
         return {

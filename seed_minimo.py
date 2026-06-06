@@ -1,4 +1,5 @@
-"""Seed mÃ­nimo: purga BD y crea solo datos esenciales para operar"""
+# -*- coding: utf-8 -*-
+"""Seed mínimo: purga BD y crea solo datos esenciales para operar"""
 import uuid
 import json
 from datetime import datetime
@@ -12,7 +13,7 @@ PERMISOS_CATALOGO = [
     ("crear_estudiante", "Crear Estudiante", "Crear nuevos estudiantes", "estudiantes"),
     ("editar_estudiante", "Editar Estudiante", "Editar datos de estudiantes", "estudiantes"),
     ("eliminar_estudiante", "Eliminar Estudiante", "Eliminar estudiantes", "estudiantes"),
-    ("ver_historial_estudiante", "Ver Historial", "Ver historial acadÃ©mico", "estudiantes"),
+    ("ver_historial_estudiante", "Ver Historial", "Ver historial académico", "estudiantes"),
     ("ver_alertas", "Ver Alertas", "Ver lista de alertas", "alertas"),
     ("crear_alerta", "Crear Alerta", "Crear nuevas alertas", "alertas"),
     ("editar_alerta", "Editar Alerta", "Editar alertas", "alertas"),
@@ -31,9 +32,9 @@ PERMISOS_CATALOGO = [
     ("ver_artefactos", "Ver Artefactos", "Ver artefactos", "artefactos"),
     ("subir_artefacto", "Subir Artefacto", "Subir artefactos", "artefactos"),
     ("eliminar_artefacto", "Eliminar Artefacto", "Eliminar artefactos", "artefactos"),
-    ("ver_parametrizacion", "Ver ParametrizaciÃ³n", "Ver parÃ¡metros del sistema", "parametrizacion"),
-    ("editar_parametrizacion", "Editar ParametrizaciÃ³n", "Editar parÃ¡metros del sistema", "parametrizacion"),
-    ("ver_dashboard", "Ver Dashboard", "Ver dashboard y estadÃ­sticas", "dashboard"),
+    ("ver_parametrizacion", "Ver Parametrización", "Ver parámetros del sistema", "parametrizacion"),
+    ("editar_parametrizacion", "Editar Parametrización", "Editar parámetros del sistema", "parametrizacion"),
+    ("ver_dashboard", "Ver Dashboard", "Ver dashboard y estadísticas", "dashboard"),
     ("ver_reportes", "Ver Reportes", "Ver reportes", "dashboard"),
     ("gestionar_usuarios", "Gestionar Usuarios", "Crear, editar, usuarios", "admin"),
     ("gestionar_permisos", "Gestionar Permisos", "Administrar permisos de usuarios", "admin"),
@@ -68,26 +69,26 @@ PERMISOS_APOYO = [
 
 NOVEDADES_POR_TIPO = {
     "RENDIMIENTO_ACADEMICO": [
-        ("Bajo rendimiento acumulado", "Estudiantes que entran en prueba acadÃ©mica o tienen un promedio por debajo del estÃ¡ndar institucional."),
-        ("PÃ©rdida recurrente de asignaturas", "Especialmente cuando se trata de materias del nÃºcleo bÃ¡sico."),
-        ("Inasistencia injustificada", "Ausencias reiteradas que superan el porcentaje permitido o que muestran un patrÃ³n de desconexiÃ³n."),
-        ("Falta de competencias bÃ¡sicas", "Dificultades marcadas en lectoescritura, razonamiento lÃ³gico o mÃ©todos de estudio."),
+        ("Bajo rendimiento acumulado", "Estudiantes que entran en prueba académica o tienen un promedio por debajo del estándar institucional."),
+        ("Pérdida recurrente de asignaturas", "Especialmente cuando se trata de materias del núcleo básico."),
+        ("Inasistencia injustificada", "Ausencias reiteradas que superan el porcentaje permitido o que muestran un patrón de desconexión."),
+        ("Falta de competencias básicas", "Dificultades marcadas en lectoescritura, razonamiento lógico o métodos de estudio."),
         ("Otra", None),
     ],
     "PSICOSOCIAL": [
-        ("Crisis emocionales o ansiedad", "Manifestaciones de estrÃ©s elevado, depresiÃ³n o cambios drÃ¡sticos en el comportamiento."),
-        ("Problemas familiares", "Duelos, separaciones o conflictos en el hogar que interfieren con la concentraciÃ³n del estudiante."),
+        ("Crisis emocionales o ansiedad", "Manifestaciones de estrés elevado, depresión o cambios drásticos en el comportamiento."),
+        ("Problemas familiares", "Duelos, separaciones o conflictos en el hogar que interfieren con la concentración del estudiante."),
         ("Consumo de sustancias", "Casos detectados o sospechas de abuso de alcohol o sustancias psicoactivas."),
-        ("Dificultades de adaptaciÃ³n", "ComÃºn en estudiantes que provienen de otras regiones (forÃ¡neos) y presentan problemas para integrarse al entorno universitario o a la ciudad."),
+        ("Dificultades de adaptación", "Común en estudiantes que provienen de otras regiones (foráneos) y presentan problemas para integrarse al entorno universitario o a la ciudad."),
     ],
     "SOCIO_ECONOMICO": [
-        ("Inestabilidad financiera", "Dificultades para cubrir el pago de matrÃ­cula, materiales de estudio o transporte."),
-        ("Inseguridad alimentaria", "Estudiantes que no cuentan con los recursos para una nutriciÃ³n adecuada durante la jornada acadÃ©mica."),
-        ("Carga laboral excesiva", "Estudiantes que trabajan jornadas extensas que les impiden cumplir con sus compromisos acadÃ©micos."),
+        ("Inestabilidad financiera", "Dificultades para cubrir el pago de matrícula, materiales de estudio o transporte."),
+        ("Inseguridad alimentaria", "Estudiantes que no cuentan con los recursos para una nutrición adecuada durante la jornada académica."),
+        ("Carga laboral excesiva", "Estudiantes que trabajan jornadas extensas que les impiden cumplir con sus compromisos académicos."),
     ],
     "INSTITUCIONAL_VOCACIONAL": [
-        ("Inconformidad con la carrera", "Dudas sobre la elecciÃ³n profesional o falta de motivaciÃ³n con el plan de estudios."),
-        ("Desconocimiento de servicios", "Estudiantes que requieren orientaciÃ³n sobre becas, subsidios o apoyos institucionales y no saben cÃ³mo acceder a ellos."),
+        ("Inconformidad con la carrera", "Dudas sobre la elección profesional o falta de motivación con el plan de estudios."),
+        ("Desconocimiento de servicios", "Estudiantes que requieren orientación sobre becas, subsidios o apoyos institucionales y no saben cómo acceder a ellos."),
     ],
     "OTRO": [
         ("Otra", None),
@@ -95,26 +96,26 @@ NOVEDADES_POR_TIPO = {
 }
 
 PARAMETROS = [
-    ("PERIODO_ACTUAL", "2026-1", "PerÃ­odo acadÃ©mico actual", "texto"),
-    ("UMbral_ROJO", "2.0", "Promedio mÃ­nimo para riesgo rojo", "numero"),
-    ("UMbral_AMARILLO", "3.0", "Promedio mÃ­nimo para riesgo amarillo", "numero"),
-    ("NOTIFICAR_DOCENTE", "true", "Enviar notificaciÃ³n a docentes", "booleano"),
+    ("PERIODO_ACTUAL", "2026-1", "Período académico actual", "texto"),
+    ("UMbral_ROJO", "2.0", "Promedio mínimo para riesgo rojo", "numero"),
+    ("UMbral_AMARILLO", "3.0", "Promedio mínimo para riesgo amarillo", "numero"),
+    ("NOTIFICAR_DOCENTE", "true", "Enviar notificación a docentes", "booleano"),
 ]
 
 PLANTILLA_PREGUNTAS = [
-    {"id": 1, "texto": "Estrato socioeconÃ³mico", "tipo": "opcion_multiple",
+    {"id": 1, "texto": "Estrato socioeconómico", "tipo": "opcion_multiple",
      "opciones": ["1", "2", "3", "4", "5", "6"], "requerida": True, "campo": "estrato", "editable": True},
-    {"id": 2, "texto": "GÃ©nero", "tipo": "opcion_multiple",
+    {"id": 2, "texto": "Género", "tipo": "opcion_multiple",
      "opciones": ["H", "M", "OTRO"], "requerida": True, "campo": "genero", "editable": True},
     {"id": 3, "texto": "Procedencia", "tipo": "opcion_multiple",
      "opciones": ["LOCAL", "FORANEO"], "requerida": True, "campo": "procedencia", "editable": True},
     {"id": 4, "texto": "Ingreso familiar mensual ($)", "tipo": "texto_libre",
      "requerida": False, "campo": "ingreso_familiar", "editable": True},
-    {"id": 5, "texto": "Correo electrÃ³nico", "tipo": "texto_libre",
+    {"id": 5, "texto": "Correo electrónico", "tipo": "texto_libre",
      "requerida": False, "campo": "email", "editable": True},
-    {"id": 6, "texto": "TelÃ©fono de contacto", "tipo": "texto_libre",
+    {"id": 6, "texto": "Teléfono de contacto", "tipo": "texto_libre",
      "requerida": False, "campo": "telefono", "editable": True},
-    {"id": 7, "texto": "Programa acadÃ©mico", "tipo": "texto_libre",
+    {"id": 7, "texto": "Programa académico", "tipo": "texto_libre",
      "requerida": True, "campo": "programa", "editable": False},
     {"id": 8, "texto": "Semestre actual", "tipo": "opcion_multiple",
      "opciones": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
@@ -198,14 +199,14 @@ def seed_usuarios(conn):
 
 
 def seed_parametrizacion(conn):
-    print("Creando parametrizaciÃ³n...")
+    print("Creando parametrización...")
     for clave, valor, descripcion, tipo in PARAMETROS:
         conn.execute(text("""
             INSERT INTO parametrizacion (id, clave, valor, descripcion, tipo)
             SELECT gen_random_uuid(), :clave, :valor, :descripcion, :tipo
             WHERE NOT EXISTS (SELECT 1 FROM parametrizacion WHERE clave = :clave)
         """), {"clave": clave, "valor": valor, "descripcion": descripcion, "tipo": tipo})
-    print(f"  - {len(PARAMETROS)} parÃ¡metros creados/verificados")
+    print(f"  - {len(PARAMETROS)} parámetros creados/verificados")
 
 
 def seed_novedades(conn):
@@ -238,19 +239,19 @@ def seed_plantilla_encuesta(conn):
             SELECT 1 FROM encuestas WHERE titulo = :titulo AND estado = 'BORRADOR'
         )
     """), {
-        "titulo": "ActualizaciÃ³n de Datos Estudiantiles",
-        "descripcion": "Completa o actualiza tus datos personales y acadÃ©micos para mantener la informaciÃ³n al dÃ­a.",
+        "titulo": "Actualización de Datos Estudiantiles",
+        "descripcion": "Completa o actualiza tus datos personales y académicos para mantener la información al día.",
     })
 
     if admin_id:
         encuesta = conn.execute(text(
-            "SELECT id FROM encuestas WHERE titulo = 'ActualizaciÃ³n de Datos Estudiantiles' AND estado = 'BORRADOR'"
+            "SELECT id FROM encuestas WHERE titulo = 'Actualización de Datos Estudiantiles' AND estado = 'BORRADOR'"
         )).fetchone()
         if encuesta:
             conn.execute(text(f"""
                 INSERT INTO auditoria (id, usuario_id, accion, entidad, entidad_id, detalles, estado)
                 SELECT gen_random_uuid(), :usuario_id, 'CREAR', 'Encuesta', :entidad_id,
-                    '{{"titulo": "ActualizaciÃ³n de Datos Estudiantiles", "num_preguntas": 8, "es_plantilla": true}}'::jsonb, 'EXITOSO'
+                    '{{"titulo": "Actualización de Datos Estudiantiles", "num_preguntas": 8, "es_plantilla": true}}'::jsonb, 'EXITOSO'
                 WHERE NOT EXISTS (
                     SELECT 1 FROM auditoria WHERE entidad_id = :entidad_id2 AND accion = 'CREAR'
                 )
@@ -264,7 +265,7 @@ def seed_plantilla_encuesta(conn):
 
 
 def main():
-    print("\n=== SEED MÃNIMO ===\n")
+    print("\n=== SEED MÍNIMO ===\n")
 
     with engine.connect() as conn:
         purge_all_data(conn)
@@ -279,7 +280,7 @@ def main():
 
         conn.commit()
 
-    print("\n=== SEED MÃNIMO COMPLETADO ===")
+    print("\n=== SEED MÍNIMO COMPLETADO ===")
     print("\nUsuarios creados:")
     print("  - admin@unipamplona.edu.co (password: Admin123!)")
     print("  - docente@unipamplona.edu.co (password: Docente123!)")
@@ -288,12 +289,12 @@ def main():
     print(f"  - {len(PERMISOS_CATALOGO)} permisos")
     print(f"  - Asignaciones por rol (ADMIN: 32, DOCENTE: {len(PERMISOS_DOCENTE)}, APOYO: {len(PERMISOS_APOYO)})")
     print("  - 3 usuarios")
-    print("  - 4 parÃ¡metros del sistema")
+    print("  - 4 parámetros del sistema")
     print(f"  - {sum(len(v) for v in NOVEDADES_POR_TIPO.values())} novedades de casos")
     print("  - 1 plantilla de encuesta (BORRADOR)")
-    print("\nÃnica opciÃ³n antes de ejecutar: editar PERIODO_ACTUAL en seed_minimo.py lÃ­nea 212")
+    print("\nÚnica opción antes de ejecutar: editar PERIODO_ACTUAL en seed_minimo.py línea 212")
     print("  si el periodo actual no es 2026-1\n")
-    print("Â¡Listo para usar!")
+    print("¡Listo para usar!")
 
 
 if __name__ == "__main__":

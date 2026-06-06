@@ -9,6 +9,7 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
+from app.config import settings
 from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.anexo_actividad import AnexoActividad
 from app.utils.audit import AuditService
@@ -74,7 +75,7 @@ class AnexoActividadService:
         self._validate_file(file)
 
         relative_path = self._get_storage_path(file.filename)
-        absolute_path = os.path.abspath(relative_path)
+        absolute_path = os.path.join(settings.UPLOAD_BASE_PATH, relative_path)
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
 
         with open(absolute_path, "wb") as buffer:
@@ -152,7 +153,7 @@ class AnexoActividadService:
         if not anexo:
             raise EntityNotFoundError("AnexoActividad", anexo_id)
 
-        absolute_path = os.path.abspath(anexo.url)
+        absolute_path = os.path.join(settings.UPLOAD_BASE_PATH, anexo.url)
         if not os.path.exists(absolute_path):
             raise EntityNotFoundError("AnexoActividad (archivo)", anexo_id)
 
@@ -165,7 +166,7 @@ class AnexoActividadService:
         if not anexo:
             raise EntityNotFoundError("AnexoActividad", anexo_id)
 
-        absolute_path = os.path.abspath(anexo.url)
+        absolute_path = os.path.join(settings.UPLOAD_BASE_PATH, anexo.url)
         if os.path.exists(absolute_path):
             os.remove(absolute_path)
 

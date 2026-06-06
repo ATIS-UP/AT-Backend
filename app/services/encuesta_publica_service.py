@@ -30,8 +30,16 @@ CAMPO_VALIDACION = {
     "semestre": lambda v: 1 <= int(v) <= 12,
     "email": lambda v: "@" in str(v) and len(str(v)) <= 255,
     "telefono": lambda v: str(v).isdigit() and 7 <= len(str(v)) <= 15,
-    "ingreso_familiar": lambda v: int(v) > 0,
+    "ingreso_familiar": lambda v: str(v) in ("menos_1", "entre_1_2", "entre_2_3", "entre_3_5", "mas_5"),
     "programa": lambda v: len(str(v)) <= 255,
+}
+
+SMMLV_RANGOS = {
+    "menos_1": {"label": "Menos de 1 SMMLV ($1.300.000)", "valor_promedio": 650000},
+    "entre_1_2": {"label": "Entre 1 y 2 SMMLV ($1.300.000 - $2.600.000)", "valor_promedio": 1950000},
+    "entre_2_3": {"label": "Entre 2 y 3 SMMLV ($2.600.000 - $3.900.000)", "valor_promedio": 3250000},
+    "entre_3_5": {"label": "Entre 3 y 5 SMMLV ($3.900.000 - $6.500.000)", "valor_promedio": 5200000},
+    "mas_5": {"label": "Más de 5 SMMLV (+$6.500.000)", "valor_promedio": 7800000},
 }
 
 CAMPO_ERROR_MSG = {
@@ -41,7 +49,7 @@ CAMPO_ERROR_MSG = {
     "semestre": "Semestre debe ser un número entre 1 y 12",
     "email": "El correo electrónico no es válido",
     "telefono": "El teléfono solo debe contener dígitos (7 a 15 caracteres)",
-    "ingreso_familiar": "El ingreso familiar debe ser un número entero positivo",
+    "ingreso_familiar": "Debe seleccionar un rango de ingreso válido",
     "programa": "El programa académico excede la longitud máxima",
 }
 
@@ -158,8 +166,8 @@ class EncuestaPublicaService:
              "opciones": ["H", "M", "OTRO"], "requerida": True, "campo": "genero", "editable": True},
             {"id": 3, "texto": "Procedencia", "tipo": "opcion_multiple",
              "opciones": ["LOCAL", "FORANEO"], "requerida": True, "campo": "procedencia", "editable": True},
-            {"id": 4, "texto": "Ingreso familiar mensual ($)", "tipo": "texto_libre",
-             "requerida": False, "campo": "ingreso_familiar", "editable": True},
+            {"id": 4, "texto": "Ingreso familiar mensual (SMMLV)", "tipo": "opcion_multiple",
+             "opciones": [r["label"] for r in SMMLV_RANGOS.values()], "requerida": False, "campo": "ingreso_familiar", "editable": True},
             {"id": 5, "texto": "Correo electrónico", "tipo": "texto_libre",
              "requerida": False, "campo": "email", "editable": True},
             {"id": 6, "texto": "Teléfono de contacto", "tipo": "texto_libre",
@@ -288,7 +296,14 @@ class EncuestaPublicaService:
                 continue
             if encrypted:
                 setattr(estudiante, attr, encrypt_data(str(valor_nuevo)))
-            elif campo in ("estrato", "semestre", "ingreso_familiar"):
+            elif campo in ("estrato", "semestre"):
                 setattr(estudiante, attr, int(valor_nuevo))
+            elif campo == "ingreso_familiar":
+                rango_key = None
+                for k, r in SMMLV_RANGOS.items():
+                    if r["label"] == valor_nuevo:
+                        rango_key = k
+                        break
+                setattr(estudiante, attr, SMMLV_RANGOS[rango_key]["valor_promedio"] if rango_key else int(valor_nuevo))
             else:
                 setattr(estudiante, attr, str(valor_nuevo))

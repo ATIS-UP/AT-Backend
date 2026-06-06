@@ -41,7 +41,7 @@ class ActividadInstitucionalService:
             updated_at=actividad.updated_at,
         )
 
-    def listar(self, pagina: int = 1, por_pagina: int = 20, estado: Optional[str] = None) -> Tuple[List[ActividadInstitucionalResponse], int]:
+    def listar(self, pagina: int = 1, por_pagina: int = 20, estado: Optional[str] = None, tipo: Optional[str] = None) -> Tuple[List[ActividadInstitucionalResponse], int]:
         query = self.db.query(ActividadInstitucional).options(
             joinedload(ActividadInstitucional.creador),
             joinedload(ActividadInstitucional.archivos_anexos),
@@ -49,6 +49,8 @@ class ActividadInstitucionalService:
 
         if estado:
             query = query.filter(ActividadInstitucional.estado == EstadoActividadInstitucional(estado))
+        if tipo:
+            query = query.filter(ActividadInstitucional.tipo == TipoActividadInstitucional(tipo))
 
         total = query.count()
         actividades = query.order_by(ActividadInstitucional.created_at.desc()).offset((pagina - 1) * por_pagina).limit(por_pagina).all()

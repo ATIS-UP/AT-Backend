@@ -30,7 +30,7 @@ async def list_estudiantes(
     buscar: str = Query(None),
     estado: str = Query(None),
     programa: str = Query(None),
-    semestre: int = Query(None, ge=1, le=15),
+    semestre: int = Query(None, ge=1, le=12),
 ):
     """list students with pagination and filters"""
     service = EstudianteService(db)
@@ -45,8 +45,8 @@ async def descargar_plantilla(
     current_user: User = Depends(require_permiso("crear_estudiante")),
 ):
     """Download a CSV template for bulk student upload."""
-    headers_row = ["nombres", "apellidos", "documento", "telefono", "email", "programa", "semestre", "estado"]
-    example_row = ["María", "González Pérez", "1098765432", "3001234567", "mgonzalez@unipamplona.edu.co", "Ingeniería de Sistemas", "3", "ACTIVO"]
+    headers_row = ["nombres", "apellidos", "documento", "telefono", "email", "programa", "semestre", "estado", "sede"]
+    example_row = ["María", "González Pérez", "1098765432", "3001234567", "mgonzalez@unipamplona.edu.co", "Ingeniería de Sistemas", "3", "ACTIVO", "PAMPLONA"]
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(headers_row)
