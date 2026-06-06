@@ -48,6 +48,7 @@ class EstudianteService:
                 if est.promedio_acumulado
                 else None
             ),
+            sede=est.sede,
             estado=est.estado.value,
             created_at=est.created_at,
             updated_at=est.updated_at,
@@ -145,11 +146,21 @@ class EstudianteService:
         if existente:
             raise DuplicateEntityError("Estudiante", "codigo", data.codigo)
 
+        if data.email:
+            existente_email = (
+                self.db.query(Estudiante)
+                .filter(Estudiante.email_hash == hash_data(data.email))
+                .first()
+            )
+            if existente_email:
+                raise DuplicateEntityError("Estudiante", "email", data.email)
+
         nuevo = Estudiante(
             codigo=data.codigo,
             nombres=encrypt_data(data.nombres),
             apellidos=encrypt_data(data.apellidos),
             email=encrypt_data(data.email) if data.email else None,
+            email_hash=hash_data(data.email) if data.email else None,
             documento=encrypt_data(data.documento) if data.documento else None,
             documento_hash=hash_data(data.documento) if data.documento else None,
             telefono=encrypt_data(data.telefono) if data.telefono else None,
@@ -229,6 +240,19 @@ class EstudianteService:
 
         if "documento" in update_data and update_data["documento"] is not None:
             est.documento_hash = hash_data(update_data["documento"])
+
+        if "email" in update_data and update_data["email"] is not None:
+            nuevo_email_hash = hash_data(update_data["email"])
+            duplicado = (
+                self.db.query(Estudiante)
+                .filter(Estudiante.email_hash == nuevo_email_hash, Estudiante.id != est.id)
+                .first()
+            )
+            if duplicado:
+                raise DuplicateEntityError("Estudiante", "email", update_data["email"])
+            est.email_hash = nuevo_email_hash
+        elif "email" in update_data and update_data["email"] is None:
+            est.email_hash = None
 
         self.db.commit()
         self.db.refresh(est)

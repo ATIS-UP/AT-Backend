@@ -25,12 +25,13 @@ def get_service(db: Session = Depends(get_db)) -> ActividadInstitucionalService:
 async def listar_actividades(
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(20, ge=1, le=100),
+    tipo: Optional[str] = None,
     estado: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permiso("ver_actividades"))
 ):
     service = get_service(db)
-    actividades, total = service.listar(pagina, por_pagina, estado)
+    actividades, total = service.listar(pagina, por_pagina, estado, tipo)
     return {
         "actividades": actividades,
         "total": total,

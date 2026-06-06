@@ -39,6 +39,18 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
+# CSP - allow blob: images for auth-protected download URLs
+@app.middleware("http")
+async def csp_middleware(request, call_next):
+    response = await call_next(request)
+    existing = response.headers.get('Content-Security-Policy', '')
+    if 'blob:' not in existing:
+        if existing:
+            response.headers['Content-Security-Policy'] = existing + "; img-src 'self' data: blob:"
+        else:
+            response.headers['Content-Security-Policy'] = "img-src 'self' data: blob:"
+    return response
+
 # Routers
 app.include_router(auth.router)
 app.include_router(estudiantes.router)
