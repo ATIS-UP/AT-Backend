@@ -148,7 +148,7 @@ class EncuestaService:
         preguntas = encuesta.preguntas or []
         if len(preguntas) < 1:
             raise ValidationError("La encuesta debe tener al menos una pregunta para ser publicada")
-        if encuesta.fecha_fin and encuesta.fecha_fin < datetime.now(tz_utc):
+        if encuesta.fecha_fin and encuesta.fecha_fin.replace(tzinfo=tz_utc) < datetime.now(tz_utc):
             raise ValidationError("La fecha de cierre debe ser posterior a la fecha actual")
         encuesta.estado = "PUBLICADA"
         encuesta.fecha_inicio = datetime.now(tz_utc)
