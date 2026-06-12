@@ -101,11 +101,12 @@ async def create_usuario(
     )
 
     db.add(nuevo)
-    db.commit()
+    db.flush()
     db.refresh(nuevo)
 
     AuditService.log_crear(db, str(current_user.id), "Usuario", str(nuevo.id),
                           {"email": nuevo.email, "rol": nuevo.rol.value}, request.client.host)
+    db.commit()
 
     return UserResponse(
         id=str(nuevo.id),
@@ -138,11 +139,10 @@ async def update_usuario(
             value = RolEnum(value)
         setattr(user, key, value)
 
-    db.commit()
-    db.refresh(user)
-
     AuditService.log_actualizar(db, str(current_user.id), "Usuario", user_id,
                                {"email": user.email}, update_data, request.client.host)
+    db.commit()
+    db.refresh(user)
 
     return UserResponse(
         id=str(user.id),
@@ -172,10 +172,9 @@ async def delete_usuario(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No puedes eliminarte a ti mismo")
 
     user.is_active = False
-    db.commit()
-
     AuditService.log_eliminar(db, str(current_user.id), "Usuario", user_id,
                               {"email": user.email}, request.client.host)
+    db.commit()
 
     return None
 
@@ -239,6 +238,7 @@ async def update_usuario_permisos(
 
     AuditService.log_actualizar(db, str(current_user.id), "UserPermisos", user_id,
                                {}, {"permisos": permisos_data.permisos}, request.client.host)
+    db.commit()
 
     return UserPermisosResponse(
         usuario_id=str(user.id),

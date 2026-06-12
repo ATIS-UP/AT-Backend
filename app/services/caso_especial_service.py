@@ -57,13 +57,24 @@ class CasoEspecialService:
             updated_at=registro.updated_at
         )
 
+    _BUSCAR_MIN_LEN = 3
+    _BUSCAR_SCAN_LIMIT = 500
+
     def buscar_estudiantes(self, q: str, pagina: int = 1, por_pagina: int = 20, tipo: Optional[str] = None) -> Tuple[List, int]:
-        if not q:
+        if not q or len(q.strip()) < self._BUSCAR_MIN_LEN:
             return [], 0
-        
+
         q_lower = q.lower().strip()
-        
-        estudiantes = self.db.query(Estudiante).all()
+
+        # Names are Fernet-encrypted so DB-level filtering is not possible.
+        # Limit the scan window to avoid full-table CPU exhaustion.
+        estudiantes = (
+            self.db.query(Estudiante)
+            .filter(Estudiante.estado == EstadoEstudiante.ACTIVO)
+            .order_by(Estudiante.codigo)
+            .limit(self._BUSCAR_SCAN_LIMIT)
+            .all()
+        )
         
         estudiantes = [
             est for est in estudiantes

@@ -43,6 +43,7 @@ async def login(
     # Verificar si el usuario existe y está activo
     if not user or not user.is_active:
         AuditService.log_login(db, None, login_data.email, False, request.client.host)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas"
@@ -64,37 +65,35 @@ async def login(
         if user.failed_login_attempts >= 5:
             from datetime import timedelta
             user.locked_until = datetime.now(tz_utc) + timedelta(minutes=15)
-            db.commit()
             AuditService.log_login(db, str(user.id), login_data.email, False, request.client.host)
+            db.commit()
             raise HTTPException(
                 status_code=status.HTTP_423_LOCKED,
                 detail="Demasiados intentos fallidos. Cuenta bloqueada por 15 minutos."
             )
 
-        db.commit()
         AuditService.log_login(db, str(user.id), login_data.email, False, request.client.host)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas"
         )
 
-    # Login exitoso - resetear contadores
+    # Login exitoso - resetear contadores y preparar datos.
+    # Todos los cambios (user.update + refresh_token + audit log) se persisten
+    # en una sola transacción al final: o todo commitea, o nada commitea.
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login = datetime.now(tz_utc)
-    db.commit()
 
     # Crear tokens
     token_data = {"sub": str(user.id), "email": user.email, "rol": user.rol.value}
     access_token = create_access_token(token_data)
     refresh_token, expires_at = create_refresh_token({"sub": str(user.id)})
 
-    # save refresh token using the endpoint's db session
     save_refresh_token(db, str(user.id), refresh_token, expires_at)
-    db.commit()
-
-    # audit log
     AuditService.log_login(db, str(user.id), login_data.email, True, request.client.host)
+    db.commit()
 
     # Obtener permisos del usuario
     permisos = PermisoService.get_permisos_usuario(db, user)
@@ -142,14 +141,16 @@ async def logout(
     revoke_all_user_tokens(db, user_id)
     db.commit()
 
-    # audit log
     AuditService.log_logout(db, user_id, request.client.host)
+    db.commit()
 
     return {"message": "Logout exitoso"}
 
 
 @router.post("/refresh", response_model=Token)
+@limiter.limit("30/minute")
 async def refresh_token(
+    request: Request,
     refresh_data: RefreshTokenRequest,
     db: Session = Depends(get_db)
 ):

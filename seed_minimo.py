@@ -97,8 +97,8 @@ NOVEDADES_POR_TIPO = {
 
 PARAMETROS = [
     ("PERIODO_ACTUAL", "2026-1", "Período académico actual", "texto"),
-    ("UMbral_ROJO", "2.0", "Promedio mínimo para riesgo rojo", "numero"),
-    ("UMbral_AMARILLO", "3.0", "Promedio mínimo para riesgo amarillo", "numero"),
+    ("UMBRAL_ROJO", "2.0", "Promedio mínimo para riesgo rojo", "numero"),
+    ("UMBRAL_AMARILLO", "3.0", "Promedio mínimo para riesgo amarillo", "numero"),
     ("NOTIFICAR_DOCENTE", "true", "Enviar notificación a docentes", "booleano"),
 ]
 

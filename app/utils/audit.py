@@ -36,8 +36,6 @@ class AuditService:
             mensaje=mensaje
         )
         db.add(auditoria)
-        db.commit()
-        db.refresh(auditoria)
         return auditoria
 
     @staticmethod

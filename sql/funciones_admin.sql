@@ -98,21 +98,21 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION reset_parametrizacion() RETURNS void AS $$
 BEGIN
     INSERT INTO parametrizacion (id, clave, valor, descripcion, tipo)
-    VALUES (gen_random_uuid(), 'PERIODO_ACTUAL', '2026-1', 'Peri­odo academico actual', 'texto')
+    VALUES (gen_random_uuid(), 'PERIODO_ACTUAL', '2026-1', 'Período académico actual', 'texto')
     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor;
 
     INSERT INTO parametrizacion (id, clave, valor, descripcion, tipo)
-    VALUES (gen_random_uuid(), 'UMbral_ROJO', '2.0', 'Promedio mainimo para riesgo rojo', 'numero')
+    VALUES (gen_random_uuid(), 'UMBRAL_ROJO', '2.0', 'Promedio mínimo para riesgo rojo', 'numero')
     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor;
 
     INSERT INTO parametrizacion (id, clave, valor, descripcion, tipo)
-    VALUES (gen_random_uuid(), 'UMbral_AMARILLO', '3.0', 'Promedio mi­nimo para riesgo amarillo', 'numero')
+    VALUES (gen_random_uuid(), 'UMBRAL_AMARILLO', '3.0', 'Promedio mínimo para riesgo amarillo', 'numero')
     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor;
 
     INSERT INTO parametrizacion (id, clave, valor, descripcion, tipo)
-    VALUES (gen_random_uuid(), 'NOTIFICAR_DOCENTE', 'true', 'Enviar notificacion a docentes', 'booleano')
+    VALUES (gen_random_uuid(), 'NOTIFICAR_DOCENTE', 'true', 'Enviar notificación a docentes', 'booleano')
     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor;
 
-    RAISE NOTICE 'reset_parametrizacion(): 4 parametros restaurados.';
+    RAISE NOTICE 'reset_parametrizacion(): 4 parámetros restaurados.';
 END;
 $$ LANGUAGE plpgsql;

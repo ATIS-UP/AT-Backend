@@ -48,12 +48,22 @@ class AlertaAutomaticaService:
             est_id = str(insc.estudiante_id)
             # collect available grades
             notas = []
-            for nota_field in (insc.nota1, insc.nota2, insc.nota3, insc.nota_final):
-                if nota_field is not None:
-                    try:
-                        notas.append(float(nota_field))
-                    except (ValueError, TypeError):
-                        continue
+            # Prefer nota_final when available; otherwise require at least 2
+            # partial grades to avoid false positives from a single low note.
+            if insc.nota_final is not None:
+                try:
+                    notas = [float(insc.nota_final)]
+                except (ValueError, TypeError):
+                    pass
+            else:
+                for nota_field in (insc.nota1, insc.nota2, insc.nota3):
+                    if nota_field is not None:
+                        try:
+                            notas.append(float(nota_field))
+                        except (ValueError, TypeError):
+                            continue
+                if len(notas) < 2:
+                    notas = []
 
             if notas:
                 if est_id not in estudiantes_notas:
@@ -187,8 +197,6 @@ class AlertaAutomaticaService:
             # update existing alert
             existing.nivel_riesgo = nivel
             existing.promedio_actual = promedio
-            self.db.commit()
-            self.db.refresh(existing)
 
             AuditService.log(
                 db=self.db,
@@ -205,6 +213,8 @@ class AlertaAutomaticaService:
                 estado="EXITOSO",
                 mensaje="Alerta actualizada automáticamente por evaluación de notas",
             )
+            self.db.commit()
+            self.db.refresh(existing)
 
             return existing
 
@@ -220,8 +230,7 @@ class AlertaAutomaticaService:
         )
 
         self.db.add(nueva)
-        self.db.commit()
-        self.db.refresh(nueva)
+        self.db.flush()
 
         AuditService.log(
             db=self.db,
@@ -239,5 +248,7 @@ class AlertaAutomaticaService:
             estado="EXITOSO",
             mensaje="Alerta creada automáticamente por evaluación de notas",
         )
+        self.db.commit()
+        self.db.refresh(nueva)
 
         return nueva

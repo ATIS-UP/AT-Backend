@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import filetype
 import boto3
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
@@ -20,6 +21,16 @@ from app.utils.audit import AuditService
 
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg"}
+
+# map declared extension → accepted filetype MIME types (magic bytes)
+_EXT_TO_MIMES = {
+    ".pdf": {"application/pdf"},
+    ".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/zip"},
+    ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/zip"},
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+}
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -66,6 +77,17 @@ class ArtefactoService:
             raise ValidationError(
                 f"el archivo excede el tamaño máximo de 10MB ({size} bytes)",
                 fields={"file": "file exceeds 10MB limit"},
+            )
+
+        header = file.file.read(261)
+        file.file.seek(0)
+        detected = filetype.guess(header)
+        detected_mime = detected.mime if detected else None
+        allowed_mimes = _EXT_TO_MIMES.get(ext, set())
+        if allowed_mimes and detected_mime not in allowed_mimes:
+            raise ValidationError(
+                f"el contenido del archivo no coincide con la extensión '{ext}'",
+                fields={"file": f"magic bytes mismatch: detected {detected_mime}"},
             )
 
     def _get_storage_path(self, filename: str) -> str:
@@ -159,7 +181,7 @@ class ArtefactoService:
             uploaded_by=usuario_id,
         )
         self.db.add(artefacto)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(artefacto)
 
         AuditService.log_crear(
@@ -170,6 +192,7 @@ class ArtefactoService:
             datos={"nombre": file.filename, "tipo": artefacto.tipo, "ruta": relative_path},
             ip=ip,
         )
+        self.db.commit()
 
         return {
             "id": str(artefacto.id),
@@ -265,6 +288,5 @@ class ArtefactoService:
             datos_eliminados={"nombre": artefacto.nombre, "tipo": artefacto.tipo, "ruta": artefacto.url},
             ip=ip,
         )
-
         self.db.delete(artefacto)
         self.db.commit()

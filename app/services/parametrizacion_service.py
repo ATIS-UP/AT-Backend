@@ -126,8 +126,6 @@ class ParametrizacionService:
 
         valor_anterior = param.valor
         param.valor = nuevo_valor
-        self.db.commit()
-        self.db.refresh(param)
 
         AuditService.log_actualizar(
             self.db,
@@ -138,6 +136,8 @@ class ParametrizacionService:
             {"valor": nuevo_valor},
             ip,
         )
+        self.db.commit()
+        self.db.refresh(param)
 
         return self._to_dict(param)
 

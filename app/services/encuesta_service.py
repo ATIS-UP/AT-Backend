@@ -46,12 +46,13 @@ class EncuestaService:
             preguntas=preguntas, estado="BORRADOR", periodo=data.get("periodo"), fecha_fin=fecha_fin,
         )
         self.db.add(encuesta)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(encuesta)
         AuditService.log_crear(
             db=self.db, usuario_id=usuario_id, entidad="Encuesta",
             entidad_id=str(encuesta.id), datos={"titulo": encuesta.titulo, "num_preguntas": len(preguntas)},
         )
+        self.db.commit()
         return self._to_dict(encuesta)
 
     def actualizar(self, encuesta_id: str, data: dict, usuario_id: str) -> dict:
@@ -83,12 +84,12 @@ class EncuestaService:
             else:
                 encuesta.fecha_fin = fecha_fin
 
-        self.db.commit()
-        self.db.refresh(encuesta)
         AuditService.log_actualizar(
             db=self.db, usuario_id=usuario_id, entidad="Encuesta",
             entidad_id=str(encuesta.id), datos_anteriores=datos_anteriores, datos_nuevos=self._to_dict(encuesta),
         )
+        self.db.commit()
+        self.db.refresh(encuesta)
         return self._to_dict(encuesta)
 
     def procesar_vencimientos(self) -> dict:
@@ -114,12 +115,12 @@ class EncuestaService:
     def eliminar(self, encuesta_id: str, usuario_id: str) -> None:
         encuesta = self._get_or_raise(encuesta_id)
         datos_eliminados = self._to_dict(encuesta)
-        self.db.delete(encuesta)
-        self.db.commit()
         AuditService.log_eliminar(
             db=self.db, usuario_id=usuario_id, entidad="Encuesta",
             entidad_id=str(encuesta.id), datos_eliminados=datos_eliminados,
         )
+        self.db.delete(encuesta)
+        self.db.commit()
 
     def duplicar(self, encuesta_id: str, usuario_id: str) -> dict:
         original = self._get_or_raise(encuesta_id)
@@ -133,12 +134,13 @@ class EncuestaService:
             fecha_inicio=None, fecha_fin=None, es_publica=False,
         )
         self.db.add(clon)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(clon)
         AuditService.log_crear(
             db=self.db, usuario_id=usuario_id, entidad="Encuesta", entidad_id=str(clon.id),
             datos={"titulo": clon.titulo, "num_preguntas": len(nuevas_preguntas), "duplicado_de": str(original.id)},
         )
+        self.db.commit()
         return self._to_dict(clon)
 
     def publicar(self, encuesta_id: str, usuario_id: str) -> dict:
@@ -152,12 +154,12 @@ class EncuestaService:
             raise ValidationError("La fecha de cierre debe ser posterior a la fecha actual")
         encuesta.estado = "PUBLICADA"
         encuesta.fecha_inicio = datetime.now(tz_utc)
-        self.db.commit()
-        self.db.refresh(encuesta)
         AuditService.log_actualizar(
             db=self.db, usuario_id=usuario_id, entidad="Encuesta",
             entidad_id=str(encuesta.id), datos_anteriores={"estado": "BORRADOR"}, datos_nuevos={"estado": "PUBLICADA"},
         )
+        self.db.commit()
+        self.db.refresh(encuesta)
         return self._to_dict(encuesta)
 
     def cerrar(self, encuesta_id: str, usuario_id: str) -> dict:
@@ -166,12 +168,12 @@ class EncuestaService:
             raise ValidationError("Solo se pueden cerrar encuestas en estado PUBLICADA")
         encuesta.estado = "CERRADA"
         encuesta.fecha_fin = datetime.now(tz_utc)
-        self.db.commit()
-        self.db.refresh(encuesta)
         AuditService.log_actualizar(
             db=self.db, usuario_id=usuario_id, entidad="Encuesta",
             entidad_id=str(encuesta.id), datos_anteriores={"estado": "PUBLICADA"}, datos_nuevos={"estado": "CERRADA"},
         )
+        self.db.commit()
+        self.db.refresh(encuesta)
         return self._to_dict(encuesta)
 
     def registrar_respuesta(self, encuesta_id: str, estudiante_id: str, respuestas: list) -> dict:

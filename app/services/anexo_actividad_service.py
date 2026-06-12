@@ -5,6 +5,7 @@ import shutil
 from datetime import datetime
 from typing import List, Optional
 
+import filetype
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -16,6 +17,15 @@ from app.utils.audit import AuditService
 
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".png", ".jpg", ".jpeg"}
+
+_EXT_TO_MIMES = {
+    ".pdf": {"application/pdf"},
+    ".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/zip"},
+    ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/zip"},
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+}
 MAX_FILE_SIZE = 10 * 1024 * 1024
 UPLOAD_DIR = "uploads/anexos_actividades"
 
@@ -43,6 +53,17 @@ class AnexoActividadService:
             raise ValidationError(
                 f"el archivo excede el tamaño máximo de 10MB ({size} bytes)",
                 fields={"file": "file exceeds 10MB limit"},
+            )
+
+        header = file.file.read(261)
+        file.file.seek(0)
+        detected = filetype.guess(header)
+        detected_mime = detected.mime if detected else None
+        allowed_mimes = _EXT_TO_MIMES.get(ext, set())
+        if allowed_mimes and detected_mime not in allowed_mimes:
+            raise ValidationError(
+                f"el contenido del archivo no coincide con la extensión '{ext}'",
+                fields={"file": f"magic bytes mismatch: detected {detected_mime}"},
             )
 
     def _get_storage_path(self, filename: str) -> str:
@@ -89,7 +110,7 @@ class AnexoActividadService:
             uploaded_by=usuario_id,
         )
         self.db.add(anexo)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(anexo)
 
         AuditService.log_crear(
@@ -100,6 +121,7 @@ class AnexoActividadService:
             datos={"nombre": file.filename, "tipo": anexo.tipo, "actividad_id": actividad_id},
             ip=ip,
         )
+        self.db.commit()
 
         return {
             "id": str(anexo.id),
@@ -178,6 +200,5 @@ class AnexoActividadService:
             datos_eliminados={"nombre": anexo.nombre, "tipo": anexo.tipo, "actividad_id": str(anexo.actividad_id)},
             ip=ip,
         )
-
         self.db.delete(anexo)
         self.db.commit()

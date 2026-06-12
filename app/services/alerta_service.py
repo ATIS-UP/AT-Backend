@@ -2,7 +2,7 @@
 from uuid import UUID
 from typing import Optional
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.alerta import Alerta, Actividad, NivelRiesgo, EstadoSeguimiento
@@ -34,7 +34,9 @@ class AlertaService:
         """convert an alerta orm instance to response schema"""
         estudiante_nombre = None
         try:
-            est = self.db.query(Estudiante).filter(Estudiante.id == alerta.estudiante_id).first()
+            est = alerta.estudiante  # uses relationship; eager-loaded when available
+            if est is None:
+                est = self.db.query(Estudiante).filter(Estudiante.id == alerta.estudiante_id).first()
             if est:
                 nombres = decrypt_data(est.nombres)
                 apellidos = decrypt_data(est.apellidos)
@@ -108,7 +110,8 @@ class AlertaService:
 
         total = query.count()
         alertas = (
-            query.order_by(Alerta.created_at.desc())
+            query.options(joinedload(Alerta.estudiante))
+            .order_by(Alerta.created_at.desc())
             .offset((pagina - 1) * por_pagina)
             .limit(por_pagina)
             .all()
@@ -166,7 +169,7 @@ class AlertaService:
         )
 
         self.db.add(nueva)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(nueva)
 
         AuditService.log_crear(
@@ -181,6 +184,7 @@ class AlertaService:
             },
             ip,
         )
+        self.db.commit()
 
         return self._to_response(nueva)
 
@@ -205,9 +209,6 @@ class AlertaService:
             else:
                 setattr(alerta, key, value)
 
-        self.db.commit()
-        self.db.refresh(alerta)
-
         AuditService.log_actualizar(
             self.db,
             usuario_id,
@@ -217,6 +218,8 @@ class AlertaService:
             update_fields,
             ip,
         )
+        self.db.commit()
+        self.db.refresh(alerta)
 
         return self._to_response(alerta)
 
@@ -230,8 +233,6 @@ class AlertaService:
 
         estado_anterior = alerta.estado_seguimiento.value
         alerta.estado_seguimiento = nuevo_estado
-        self.db.commit()
-        self.db.refresh(alerta)
 
         AuditService.log_actualizar(
             self.db,
@@ -242,6 +243,8 @@ class AlertaService:
             {"estado_seguimiento": nuevo_estado},
             ip,
         )
+        self.db.commit()
+        self.db.refresh(alerta)
 
         return self._to_response(alerta)
 
@@ -263,7 +266,6 @@ class AlertaService:
             },
             ip,
         )
-
         self.db.delete(alerta)
         self.db.commit()
 

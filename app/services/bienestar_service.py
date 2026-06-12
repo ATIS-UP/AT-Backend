@@ -184,17 +184,25 @@ class BienestarService:
                     existing.uploaded_by = usuario_id
                     actualizados += 1
                 else:
-                    new_rec = BienestarRegistro(
-                        periodo=periodo,
-                        servicio=servicio,
-                        cantidad=cantidad,
-                        uploaded_by=usuario_id,
-                    )
-                    self.db.add(new_rec)
-                    existing_records[(periodo, servicio)] = new_rec
-                    insertados += 1
-
-        self.db.commit()
+                    try:
+                        new_rec = BienestarRegistro(
+                            periodo=periodo,
+                            servicio=servicio,
+                            cantidad=cantidad,
+                            uploaded_by=usuario_id,
+                        )
+                        self.db.add(new_rec)
+                        existing_records[(periodo, servicio)] = new_rec
+                        insertados += 1
+                    except Exception as e:
+                        # Rollback the failing row so the session is not left in
+                        # a poisoned state. Without this, a single bad insert
+                        # would cause every subsequent add/commit in this batch
+                        # to fail (and the final commit would discard the
+                        # successful inserts from earlier rows).
+                        self.db.rollback()
+                        errores.append({"fila": idx, "columna": raw_col, "error": str(e)})
+                        continue
 
         AuditService.log(
             db=self.db,
@@ -204,6 +212,7 @@ class BienestarService:
             detalles={"insertados": insertados, "actualizados": actualizados, "errores": len(errores)},
             ip=ip,
         )
+        self.db.commit()
 
         return {
             "insertados": insertados,

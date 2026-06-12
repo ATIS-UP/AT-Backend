@@ -6,10 +6,14 @@ from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 from app.config import settings
 from app.database import get_db
 from app.error_handlers import register_error_handlers
 from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos, novedades_casos, actividades_institucionales, anexos_actividades, caracterizacion, bienestar, monitoreo
+from app.routers.auth import limiter
 
 
 @asynccontextmanager
@@ -24,6 +28,10 @@ app = FastAPI(
     description="Sistema de Alertas Tempranas - Universidad de Pamplona",
     lifespan=lifespan
 )
+
+# SlowAPI rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Global error handlers
 register_error_handlers(app)

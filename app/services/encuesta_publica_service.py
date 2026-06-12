@@ -92,18 +92,9 @@ class EncuestaPublicaService:
             .first()
         )
 
-        # Fallback: full scan + decrypt for legacy students without documento_hash
-        if not estudiante:
-            all_students = self.db.query(Estudiante).all()
-            for est in all_students:
-                if not est.documento:
-                    continue
-                decrypted = decrypt_data(est.documento)
-                if decrypted == documento:
-                    estudiante = est
-                    est.documento_hash = documento_hash
-                    self.db.commit()
-                    break
+        # Legacy students without documento_hash are not found by hash lookup.
+        # Full-table decryption scans are omitted to prevent DoS; run the
+        # hash-backfill migration (populate documento_hash) to cover them.
         if not estudiante:
             return {"existe": False, "ya_respondio": False, "puede_responder": False,
                     "estudiante_nombre": None, "estudiante_id": None}
@@ -185,13 +176,14 @@ class EncuestaPublicaService:
             preguntas=preguntas, estado="BORRADOR", periodo=None,
         )
         self.db.add(encuesta)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(encuesta)
         AuditService.log_crear(
             db=self.db, usuario_id=usuario_id, entidad="Encuesta",
             entidad_id=str(encuesta.id),
             datos={"titulo": encuesta.titulo, "num_preguntas": len(preguntas), "es_plantilla": True},
         )
+        self.db.commit()
         return self._to_dict(encuesta)
 
     # -- private helpers --

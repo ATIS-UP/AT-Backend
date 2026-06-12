@@ -15,8 +15,11 @@ class MonitoreoService:
         materias = self._failed_subjects(periodo)
 
         total_menciones = sum(m["cantidad"] for m in materias)
-        ciencias_exactas = {"Álgebra Lineal", "Cálculo Diferencial", "Estadística"}
-        exactas = sum(m["cantidad"] for m in materias if m["materia"] in ciencias_exactas)
+        _exactas_keywords = {"algebra lineal", "calculo diferencial", "cálculo diferencial", "estadistica", "estadística"}
+        exactas = sum(
+            m["cantidad"] for m in materias
+            if m["materia"].strip().lower() in _exactas_keywords
+        )
         pct_exactas = round((exactas / total_menciones) * 100) if total_menciones else 0
 
         return {

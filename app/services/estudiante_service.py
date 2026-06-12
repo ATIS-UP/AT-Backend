@@ -180,7 +180,7 @@ class EstudianteService:
         )
 
         self.db.add(nuevo)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(nuevo)
 
         AuditService.log_crear(
@@ -191,6 +191,7 @@ class EstudianteService:
             {"codigo": nuevo.codigo, "nombres": decrypt_data(nuevo.nombres)},
             ip,
         )
+        self.db.commit()
 
         return self._to_response(nuevo)
 
@@ -254,9 +255,6 @@ class EstudianteService:
         elif "email" in update_data and update_data["email"] is None:
             est.email_hash = None
 
-        self.db.commit()
-        self.db.refresh(est)
-
         AuditService.log_actualizar(
             self.db,
             usuario_id,
@@ -266,6 +264,8 @@ class EstudianteService:
             audit_data,
             ip,
         )
+        self.db.commit()
+        self.db.refresh(est)
 
         return self._to_response(est)
 
@@ -297,9 +297,6 @@ class EstudianteService:
         except ValueError:
             raise ValidationError(f"Estado inválido: {nuevo_estado}. Valores permitidos: {', '.join([e.value for e in EstadoEstudiante])}")
 
-        self.db.commit()
-        self.db.refresh(est)
-
         AuditService.log_actualizar(
             self.db,
             usuario_id,
@@ -309,6 +306,8 @@ class EstudianteService:
             {"estado": nuevo_estado},
             ip,
         )
+        self.db.commit()
+        self.db.refresh(est)
 
         return self._to_response(est)
 
@@ -327,9 +326,6 @@ class EstudianteService:
             "nombres": decrypt_data(est.nombres),
         }
 
-        self.db.delete(est)
-        self.db.commit()
-
         AuditService.log_eliminar(
             self.db,
             usuario_id,
@@ -338,6 +334,8 @@ class EstudianteService:
             datos_eliminados,
             ip,
         )
+        self.db.delete(est)
+        self.db.commit()
 
     def obtener_historial(self, estudiante_id: str) -> HistorialAcademico:
         """get academic history for a student including inscriptions"""
