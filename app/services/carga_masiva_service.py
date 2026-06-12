@@ -10,7 +10,7 @@ from datetime import datetime
 
 from app.exceptions import ValidationError
 from app.models.estudiante import Estudiante, EstadoEstudiante
-from app.utils.security import encrypt_data
+from app.utils.security import encrypt_data, hash_data
 from app.utils.audit import AuditService
 
 # required columns that must be present in the uploaded file
@@ -60,7 +60,9 @@ class CargaMasivaService:
                 continue
 
             try:
-                was_updated = self._upsert_student(row, usuario_id, ip)
+                with self.db.begin_nested():
+                    was_updated = self._upsert_student(row, usuario_id, ip)
+                    self.db.flush()
                 if was_updated:
                     actualizadas += 1
                 else:
@@ -70,9 +72,6 @@ class CargaMasivaService:
                 detalle_errores.append(
                     {"fila": idx, "campo": "general", "error": str(e)}
                 )
-
-        # commit all changes at once
-        self.db.commit()
 
         total_filas = len(rows)
 
@@ -91,6 +90,7 @@ class CargaMasivaService:
             estado="EXITOSO",
             mensaje=f"Carga masiva: {insertadas} insertadas, {actualizadas} actualizadas, {errores} errores",
         )
+        self.db.commit()
 
         return {
             "total_filas": total_filas,
