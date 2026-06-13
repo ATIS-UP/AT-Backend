@@ -85,7 +85,7 @@ class EncuestaPublicaService:
         if encuesta.estado != "PUBLICADA":
             raise ValidationError("La encuesta no esta disponible para responder")
 
-        documento_hash = hash_data(documento)
+        documento_hash = hash_data(documento.strip())
         estudiante = (
             self.db.query(Estudiante)
             .filter(Estudiante.documento_hash == documento_hash)

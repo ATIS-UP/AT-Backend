@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from sqlalchemy import text
 from app.database import engine
-from app.utils.security import hash_password, encrypt_data
+from app.utils.security import hash_password, encrypt_data, hash_data
 
 
 # Catálogo de permisos
@@ -213,16 +213,17 @@ def seed_estudiantes_dummy(conn):
             "nombres": encrypt_data(est["nombres"]),
             "apellidos": encrypt_data(est["apellidos"]),
             "documento": encrypt_data(est["documento"]),
+            "documento_hash": hash_data(est["documento"]) if est.get("documento") else None,
             "email": encrypt_data(est["email"]) if est.get("email") else None,
             "telefono": encrypt_data(est["telefono"]) if est.get("telefono") else None,
             "programa": est["programa"],
             "semestre": est["semestre"],
             "estado": est["estado"]
         }
-        
+
         result = conn.execute(text("""
-            INSERT INTO estudiantes (id, codigo, nombres, apellidos, documento, email, telefono, programa, semestre, estado)
-            SELECT gen_random_uuid(), :codigo, :nombres, :apellidos, :documento, :email, :telefono, :programa, :semestre, CAST(:estado AS estadoestudiante)
+            INSERT INTO estudiantes (id, codigo, nombres, apellidos, documento, documento_hash, email, telefono, programa, semestre, estado)
+            SELECT gen_random_uuid(), :codigo, :nombres, :apellidos, :documento, :documento_hash, :email, :telefono, :programa, :semestre, CAST(:estado AS estadoestudiante)
             WHERE NOT EXISTS (SELECT 1 FROM estudiantes WHERE codigo = :codigo)
             RETURNING id
         """), est_encrypted)

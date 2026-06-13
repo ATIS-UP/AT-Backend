@@ -388,6 +388,7 @@ class CargaMasivaService:
                 existing.email_hash = email_hash
             if documento:
                 existing.documento = encrypt_data(documento)
+                existing.documento_hash = hash_data(documento)
             if telefono:
                 existing.telefono = encrypt_data(telefono)
             existing.sede = sede
@@ -404,6 +405,7 @@ class CargaMasivaService:
                 email=encrypt_data(email) if email else None,
                 email_hash=email_hash,
                 documento=encrypt_data(documento) if documento else None,
+                documento_hash=hash_data(documento) if documento else None,
                 telefono=encrypt_data(telefono) if telefono else None,
                 sede=sede,
             )
