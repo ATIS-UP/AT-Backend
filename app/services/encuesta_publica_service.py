@@ -30,7 +30,7 @@ CAMPO_VALIDACION = {
     "semestre": lambda v: 1 <= int(v) <= 12,
     "email": lambda v: "@" in str(v) and len(str(v)) <= 255,
     "telefono": lambda v: str(v).isdigit() and 7 <= len(str(v)) <= 15,
-    "ingreso_familiar": lambda v: str(v) in ("menos_1", "entre_1_2", "entre_2_3", "entre_3_5", "mas_5"),
+    "ingreso_familiar": lambda v: str(v) in [r["label"] for r in SMMLV_RANGOS.values()],
     "programa": lambda v: len(str(v)) <= 255,
 }
 
