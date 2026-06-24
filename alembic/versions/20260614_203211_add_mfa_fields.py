@@ -1,7 +1,7 @@
 """add mfa_secret, mfa_enabled to users and email_otp_codes table
 
 Revision ID: 20260614_203211
-Revises: add_email_hash_to_estudiantes
+Revises: 3de7e1d1cf0c
 Create Date: 2026-06-14 20:32:11.000000
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 
 revision: str = "20260614_203211"
-down_revision: Union[str, None] = "add_email_hash_to_estudiantes"
+down_revision: Union[str, None] = "3de7e1d1cf0c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
