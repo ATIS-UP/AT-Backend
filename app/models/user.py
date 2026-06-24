@@ -1,6 +1,6 @@
 """Modelos de Usuario y Permisos"""
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime, Enum, ForeignKey, Table, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Enum, ForeignKey, Table, Integer, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -27,6 +27,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     mfa_secret = Column(String(255), nullable=True)
     mfa_enabled = Column(Boolean, default=False)
+    mfa_methods = Column(ARRAY(String), default=[])
     last_login = Column(DateTime, nullable=True)
     failed_login_attempts = Column(Integer, default=0)
     locked_until = Column(DateTime, nullable=True)
@@ -80,6 +81,18 @@ class RefreshToken(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     # Relaciones
+    user = relationship("User")
+
+
+class BackupCode(Base):
+    __tablename__ = "backup_codes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    code_hash = Column(String(255), nullable=False)
+    is_used = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+
     user = relationship("User")
 
 

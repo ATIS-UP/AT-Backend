@@ -92,6 +92,7 @@ async def login(
         return LoginResponse(
             mfa_required=True,
             temp_token=temp_token,
+            mfa_methods=user.mfa_methods or [],
             usuario=UserResponse(
                 id=str(user.id),
                 email=user.email,
@@ -100,6 +101,7 @@ async def login(
                 is_active=user.is_active,
                 is_verified=user.is_verified,
                 mfa_enabled=user.mfa_enabled,
+                mfa_methods=user.mfa_methods or [],
                 last_login=user.last_login,
                 created_at=user.created_at
             )
@@ -127,6 +129,7 @@ async def login(
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
+        mfa_methods=user.mfa_methods or [],
         usuario=UserResponse(
             id=str(user.id),
             email=user.email,
@@ -135,6 +138,7 @@ async def login(
             is_active=user.is_active,
             is_verified=user.is_verified,
             mfa_enabled=user.mfa_enabled,
+            mfa_methods=user.mfa_methods or [],
             last_login=user.last_login,
             created_at=user.created_at
         )

@@ -31,6 +31,7 @@ class LoginResponse(BaseModel):
     usuario: Optional["UserResponse"] = None
     mfa_required: bool = False
     temp_token: Optional[str] = None
+    mfa_methods: Optional[List[str]] = None
 
 
 class LogoutRequest(BaseModel):
@@ -50,6 +51,7 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     mfa_enabled: bool = False
+    mfa_methods: List[str] = []
     last_login: Optional[datetime] = None
     created_at: datetime
 
@@ -79,13 +81,17 @@ class MfaSetupResponse(BaseModel):
     qr_code_url: str
 
 
+class MfaSetupRequest(BaseModel):
+    methods: List[str] = Field(min_length=1)
+
+
 class MfaVerifySetupRequest(BaseModel):
     totp_code: str = Field(min_length=6, max_length=6)
 
 
 class MfaVerifyLoginRequest(BaseModel):
     temp_token: str
-    totp_code: str = Field(min_length=6, max_length=6)
+    totp_code: Optional[str] = Field(None, min_length=6, max_length=6)
 
 
 class MfaEmailOtpRequest(BaseModel):
@@ -97,12 +103,27 @@ class MfaEmailOtpVerifyRequest(BaseModel):
     email_code: str = Field(min_length=6, max_length=6)
 
 
+class MfaBackupCodeVerifyRequest(BaseModel):
+    temp_token: str
+    backup_code: str
+
+
 class MfaDisableRequest(BaseModel):
     password: str
 
 
 class MfaStatusResponse(BaseModel):
     mfa_enabled: bool
+    mfa_methods: List[str] = []
+
+
+class MfaBackupCodesResponse(BaseModel):
+    codes: List[str]
+    remaining: int
+
+
+class MfaBackupCodesLeftResponse(BaseModel):
+    remaining: int
 
 
 # Permisos
