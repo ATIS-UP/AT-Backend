@@ -71,6 +71,8 @@ async def setup_mfa(
     )
 
     current_user.mfa_secret = encrypt_data(secret) if "totp" in data.methods else None
+    if "totp" not in data.methods:
+        current_user.mfa_enabled = True
     db.commit()
 
     return MfaSetupResponse(
@@ -108,9 +110,23 @@ async def update_mfa_methods(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update MFA methods without disabling MFA."""
+    """Update MFA methods. If empty, disable MFA completely."""
     if not current_user.mfa_enabled:
         raise HTTPException(status_code=400, detail="MFA no está activo. Actívelo primero.")
+
+    if not data.methods:
+        current_user.mfa_secret = None
+        current_user.mfa_enabled = False
+        current_user.mfa_methods = []
+        db.query(EmailOtpCode).filter(
+            EmailOtpCode.user_id == current_user.id,
+            EmailOtpCode.is_used == False
+        ).update({"is_used": True})
+        db.query(BackupCode).filter(
+            BackupCode.user_id == current_user.id
+        ).delete()
+        db.commit()
+        return {"message": "MFA desactivado (sin métodos seleccionados)", "methods": []}
 
     invalid = [m for m in data.methods if m not in VALID_METHODS]
     if invalid:

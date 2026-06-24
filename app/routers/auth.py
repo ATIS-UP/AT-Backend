@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models.user import User, RefreshToken
+from app.models.user import User, RefreshToken, BackupCode, EmailOtpCode
 from app.schemas.auth import (
     LoginRequest, LoginResponse, LogoutRequest, RefreshTokenRequest,
     Token, UserResponse
@@ -81,6 +81,49 @@ async def login(
 
     # MFA check - if user has MFA enabled, return temp token instead of full auth
     if user.mfa_enabled:
+        if not user.mfa_methods:
+            user.mfa_enabled = False
+            user.mfa_secret = None
+            user.mfa_methods = []
+            db.query(EmailOtpCode).filter(
+                EmailOtpCode.user_id == user.id,
+                EmailOtpCode.is_used == False
+            ).update({"is_used": True})
+            db.query(BackupCode).filter(
+                BackupCode.user_id == user.id
+            ).delete()
+            db.commit()
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            user.last_login = datetime.now(tz_utc)
+
+            token_data = {"sub": str(user.id), "email": user.email, "rol": user.rol.value}
+            access_token = create_access_token(token_data)
+            refresh_token, expires_at = create_refresh_token({"sub": str(user.id)})
+
+            save_refresh_token(db, str(user.id), refresh_token, expires_at)
+            AuditService.log_login(db, str(user.id), login_data.email, True, request.client.host)
+            db.commit()
+
+            permisos = PermisoService.get_permisos_usuario(db, user)
+
+            return LoginResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                mfa_methods=[],
+                usuario=UserResponse(
+                    id=str(user.id),
+                    email=user.email,
+                    nombre=user.nombre,
+                    rol=user.rol.value,
+                    is_active=user.is_active,
+                    is_verified=user.is_verified,
+                    mfa_enabled=False,
+                    mfa_methods=[],
+                    last_login=user.last_login,
+                    created_at=user.created_at
+                )
+            )
         temp_token = create_temp_token(
             {"sub": str(user.id)},
             timedelta(minutes=settings.MFA_TEMP_TOKEN_EXPIRE_MINUTES)
