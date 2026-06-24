@@ -1,5 +1,5 @@
 """router for authentication"""
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import UTC as tz_utc
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User, RefreshToken
@@ -16,7 +17,7 @@ from app.schemas.auth import (
     Token, UserResponse
 )
 from app.utils.auth import (
-    create_access_token, create_refresh_token, verify_token,
+    create_access_token, create_refresh_token, create_temp_token, verify_token,
     save_refresh_token, revoke_refresh_token, revoke_all_user_tokens,
     is_refresh_token_valid
 )
@@ -63,7 +64,6 @@ async def login(
 
         # Bloquear después de X intentos
         if user.failed_login_attempts >= 5:
-            from datetime import timedelta
             user.locked_until = datetime.now(tz_utc) + timedelta(minutes=15)
             AuditService.log_login(db, str(user.id), login_data.email, False, request.client.host)
             db.commit()
@@ -77,6 +77,32 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas"
+        )
+
+    # MFA check - if user has MFA enabled, return temp token instead of full auth
+    if user.mfa_enabled:
+        temp_token = create_temp_token(
+            {"sub": str(user.id)},
+            timedelta(minutes=settings.MFA_TEMP_TOKEN_EXPIRE_MINUTES)
+        )
+        # Log partial login (password verified, MFA pending)
+        AuditService.log_login(db, str(user.id), login_data.email, True, request.client.host)
+        db.commit()
+
+        return LoginResponse(
+            mfa_required=True,
+            temp_token=temp_token,
+            usuario=UserResponse(
+                id=str(user.id),
+                email=user.email,
+                nombre=user.nombre,
+                rol=user.rol.value,
+                is_active=user.is_active,
+                is_verified=user.is_verified,
+                mfa_enabled=user.mfa_enabled,
+                last_login=user.last_login,
+                created_at=user.created_at
+            )
         )
 
     # Login exitoso - resetear contadores y preparar datos.
@@ -108,6 +134,7 @@ async def login(
             rol=user.rol.value,
             is_active=user.is_active,
             is_verified=user.is_verified,
+            mfa_enabled=user.mfa_enabled,
             last_login=user.last_login,
             created_at=user.created_at
         )

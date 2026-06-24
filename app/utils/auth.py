@@ -33,6 +33,14 @@ def create_refresh_token(data: dict) -> tuple[str, datetime]:
     return encoded_jwt, expires
 
 
+def create_temp_token(data: dict, expires_delta: timedelta) -> str:
+    """create a temporary jwt token for mfa flow"""
+    to_encode = data.copy()
+    expire = datetime.now(tz_utc) + expires_delta
+    to_encode.update({"exp": expire, "type": "mfa"})
+    return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
 def decode_token(token: str) -> dict:
     """decode a jwt token"""
     try:

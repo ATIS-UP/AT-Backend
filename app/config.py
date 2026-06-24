@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     CORS_ORIGIN: str = "http://localhost:5173"
 
+    # MFA
+    MFA_TEMP_TOKEN_EXPIRE_MINUTES: int = 3
+
+    # SMTP
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM: Optional[str] = None
+
     # Rate Limiting
     LOGIN_RATE_LIMIT_PER_MINUTE: int = 5
     LOGIN_MAX_ATTEMPTS: int = 5
