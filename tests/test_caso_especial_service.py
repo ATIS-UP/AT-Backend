@@ -10,7 +10,7 @@ from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.caso_especial import (
     TipoRegistroCaso, EstadoRegistroCaso, AccionHistorial
 )
-from app.models.estudiante import EstadoEstudiante
+from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.services.caso_especial_service import CasoEspecialService
 
 
@@ -366,3 +366,32 @@ class TestCasoEspecialServiceActualizarEstado:
         # Se registra historial de cierre
         assert db.add.call_count >= 1
         db.commit.assert_called_once()
+
+
+class TestCasoEspecialServiceBuscarEstudiantes:
+    """search must cover every active student, not a fixed window of rows."""
+
+    @patch("app.services.caso_especial_service.decrypt_data", side_effect=lambda v: v or "")
+    def test_buscar_encuentra_estudiante_despues_de_500(self, _decrypt):
+        estudiantes = []
+        for i in range(600):
+            est = _make_estudiante()
+            est.codigo = f"{1000000 + i}"
+            est.documento = est.codigo
+            est.nombres = f"Nombre{i}"
+            estudiantes.append(est)
+        estudiantes[550].nombres = "Zuleima"
+
+        estudiantes_q = MagicMock()
+        estudiantes_q.filter.return_value.order_by.return_value.all.return_value = estudiantes
+        registros_q = MagicMock()
+        registros_q.filter.return_value.order_by.return_value.all.return_value = []
+        db = MagicMock()
+        db.query.side_effect = lambda model: estudiantes_q if model is Estudiante else registros_q
+
+        service = CasoEspecialService(db)
+        resultados, total = service.buscar_estudiantes("zuleima", pagina=1, por_pagina=10)
+
+        assert total == 1
+        assert resultados[0]["estudiante"].id == str(estudiantes[550].id)
+        estudiantes_q.filter.return_value.order_by.return_value.limit.assert_not_called()
