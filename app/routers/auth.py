@@ -1,5 +1,5 @@
 """router for authentication"""
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import UTC as tz_utc
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -8,15 +8,16 @@ from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models.user import User, RefreshToken
+from app.models.user import User, RefreshToken, BackupCode, EmailOtpCode
 from app.schemas.auth import (
     LoginRequest, LoginResponse, LogoutRequest, RefreshTokenRequest,
     Token, UserResponse
 )
 from app.utils.auth import (
-    create_access_token, create_refresh_token, verify_token,
+    create_access_token, create_refresh_token, create_temp_token, verify_token,
     save_refresh_token, revoke_refresh_token, revoke_all_user_tokens,
     is_refresh_token_valid
 )
@@ -63,7 +64,6 @@ async def login(
 
         # Bloquear después de X intentos
         if user.failed_login_attempts >= 5:
-            from datetime import timedelta
             user.locked_until = datetime.now(tz_utc) + timedelta(minutes=15)
             AuditService.log_login(db, str(user.id), login_data.email, False, request.client.host)
             db.commit()
@@ -77,6 +77,77 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales incorrectas"
+        )
+
+    # MFA check - if user has MFA enabled, return temp token instead of full auth
+    if user.mfa_enabled:
+        if not user.mfa_methods:
+            user.mfa_enabled = False
+            user.mfa_secret = None
+            user.mfa_methods = []
+            db.query(EmailOtpCode).filter(
+                EmailOtpCode.user_id == user.id,
+                EmailOtpCode.is_used == False
+            ).update({"is_used": True})
+            db.query(BackupCode).filter(
+                BackupCode.user_id == user.id
+            ).delete()
+            db.commit()
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            user.last_login = datetime.now(tz_utc)
+
+            token_data = {"sub": str(user.id), "email": user.email, "rol": user.rol.value}
+            access_token = create_access_token(token_data)
+            refresh_token, expires_at = create_refresh_token({"sub": str(user.id)})
+
+            save_refresh_token(db, str(user.id), refresh_token, expires_at)
+            AuditService.log_login(db, str(user.id), login_data.email, True, request.client.host)
+            db.commit()
+
+            permisos = PermisoService.get_permisos_usuario(db, user)
+
+            return LoginResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                mfa_methods=[],
+                usuario=UserResponse(
+                    id=str(user.id),
+                    email=user.email,
+                    nombre=user.nombre,
+                    rol=user.rol.value,
+                    is_active=user.is_active,
+                    is_verified=user.is_verified,
+                    mfa_enabled=False,
+                    mfa_methods=[],
+                    last_login=user.last_login,
+                    created_at=user.created_at
+                )
+            )
+        temp_token = create_temp_token(
+            {"sub": str(user.id)},
+            timedelta(minutes=settings.MFA_TEMP_TOKEN_EXPIRE_MINUTES)
+        )
+        # Log partial login (password verified, MFA pending)
+        AuditService.log_login(db, str(user.id), login_data.email, True, request.client.host)
+        db.commit()
+
+        return LoginResponse(
+            mfa_required=True,
+            temp_token=temp_token,
+            mfa_methods=user.mfa_methods or [],
+            usuario=UserResponse(
+                id=str(user.id),
+                email=user.email,
+                nombre=user.nombre,
+                rol=user.rol.value,
+                is_active=user.is_active,
+                is_verified=user.is_verified,
+                mfa_enabled=user.mfa_enabled,
+                mfa_methods=user.mfa_methods or [],
+                last_login=user.last_login,
+                created_at=user.created_at
+            )
         )
 
     # Login exitoso - resetear contadores y preparar datos.
@@ -101,6 +172,7 @@ async def login(
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
+        mfa_methods=user.mfa_methods or [],
         usuario=UserResponse(
             id=str(user.id),
             email=user.email,
@@ -108,6 +180,8 @@ async def login(
             rol=user.rol.value,
             is_active=user.is_active,
             is_verified=user.is_verified,
+            mfa_enabled=user.mfa_enabled,
+            mfa_methods=user.mfa_methods or [],
             last_login=user.last_login,
             created_at=user.created_at
         )
