@@ -1,0 +1,36 @@
+
+# Credenciales y configuraciones privadas
+.env
+.env.*
+*.env
+*.pem
+*.key
+credentials.json
+service-account.json
+
+# Entornos virtuales y Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Git y editores
+.git/
+.vscode/
+.idea/
+
+# Archivos cargados y datos privados
+uploads/
+logs/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos temporales y locales
+revision_evidencias.sql
+*.bak
+*.backup

@@ -8,3 +8,4 @@ from app.models.novedad_caso import NovedadCaso
 from app.models.actividad_institucional import ActividadInstitucional
 from app.models.anexo_actividad import AnexoActividad
 from app.models.bienestar import BienestarRegistro
+from app.models.evidencia_caso import EvidenciaCaso

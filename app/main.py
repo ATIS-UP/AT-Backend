@@ -12,7 +12,9 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.database import get_db
 from app.error_handlers import register_error_handlers
+
 from app.routers import auth, estudiantes, alertas, admin, dashboard, encuestas, artefactos, parametrizacion, registros_casos, novedades_casos, actividades_institucionales, anexos_actividades, caracterizacion, bienestar, monitoreo, mfa
+from app.routers import evidencias_casos
 from app.routers.auth import limiter
 
 
@@ -69,6 +71,7 @@ app.include_router(encuestas.router)
 app.include_router(artefactos.router)
 app.include_router(parametrizacion.router)
 app.include_router(registros_casos.router)
+app.include_router(evidencias_casos.router)
 app.include_router(novedades_casos.router)
 app.include_router(actividades_institucionales.router)
 app.include_router(anexos_actividades.router)
@@ -76,6 +79,8 @@ app.include_router(caracterizacion.router)
 app.include_router(bienestar.router)
 app.include_router(monitoreo.router)
 app.include_router(mfa.router)
+
+
 
 
 @app.get("/")
