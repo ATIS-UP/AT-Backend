@@ -38,6 +38,8 @@ class EncuestaService:
         fecha_fin = data.get("fecha_fin")
         if isinstance(fecha_fin, str):
             fecha_fin = datetime.fromisoformat(fecha_fin.replace("Z", "+00:00"))
+        if fecha_fin and fecha_fin.tzinfo is None:
+            fecha_fin = fecha_fin.replace(tzinfo=tz_utc)
         if fecha_fin and fecha_fin < datetime.now(tz_utc):
             raise ValidationError("La fecha de cierre debe ser posterior a la fecha actual")
 
