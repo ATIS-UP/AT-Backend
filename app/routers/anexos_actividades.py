@@ -2,12 +2,12 @@
 import mimetypes
 from fastapi import APIRouter, Depends, File, UploadFile, Query, Request
 from sqlalchemy.orm import Session
-from fastapi.responses import FileResponse
 
 from app.database import get_db
 from app.dependencies import require_permiso
 from app.models.user import User
 from app.services.anexo_actividad_service import AnexoActividadService
+from app.utils.storage import respuesta_archivo
 
 router = APIRouter(prefix="/api/actividades", tags=["anexos_actividades"])
 
@@ -47,10 +47,10 @@ async def descargar_anexo(
     current_user: User = Depends(require_permiso("ver_actividades")),
 ):
     service = get_service(db)
-    file_path = service.descargar(anexo_id)
+    contenido = service.descargar(anexo_id)
     anexo = service.obtener(anexo_id)
     media_type = mimetypes.guess_type(anexo["nombre"])[0] or "application/octet-stream"
-    return FileResponse(path=file_path, filename=anexo["nombre"], media_type=media_type)
+    return respuesta_archivo(contenido, anexo["nombre"], media_type)
 
 
 @router.delete("/anexos/{anexo_id}", status_code=204)

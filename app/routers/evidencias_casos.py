@@ -8,15 +8,14 @@ from fastapi import (
     APIRouter, Depends, File, HTTPException,
     UploadFile, status,
 )
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.dependencies import require_permiso
 from app.models.user import User
 from app.models.caso_especial import RegistroCasoEspecial
 from app.models.evidencia_caso import EvidenciaCaso
+from app.utils import storage
 
 
 router = APIRouter(
@@ -27,11 +26,8 @@ router = APIRouter(
 MAX_BYTES = 5 * 1024 * 1024
 MAX_IMAGES = 10
 
-STORAGE = (
-    Path(settings.UPLOAD_BASE_PATH)
-    / "uploads"
-    / "evidencias_casos"
-).resolve()
+# evidencia.ruta es relativa a este prefijo ("<registro_id>/<archivo>").
+PREFIJO_STORAGE = "uploads/evidencias_casos"
 
 
 def parse_id(value: str):
@@ -87,16 +83,8 @@ def obtener_evidencia(db: Session, evidencia_id: str):
     return evidencia
 
 
-def ruta_privada(evidencia: EvidenciaCaso) -> Path:
-    ruta = (STORAGE / evidencia.ruta).resolve()
-
-    if not ruta.is_relative_to(STORAGE):
-        raise HTTPException(
-            status_code=500,
-            detail="Ruta de almacenamiento inválida",
-        )
-
-    return ruta
+def clave_storage(ruta: str) -> str:
+    return f"{PREFIJO_STORAGE}/{ruta}"
 
 
 @router.get("/{registro_id}/evidencias")
@@ -195,19 +183,17 @@ async def subir_evidencia(
     tipo = "image/png" if es_png else "image/jpeg"
     nombre_interno = f"{identificador.hex}{extension}"
 
-    carpeta = STORAGE / str(parse_id(registro_id))
-    carpeta.mkdir(parents=True, exist_ok=True)
-
-    ruta = carpeta / nombre_interno
+    ruta = f"{parse_id(registro_id)}/{nombre_interno}"
+    clave = clave_storage(ruta)
 
     try:
-        ruta.write_bytes(contenido)
+        storage.guardar(clave, contenido, tipo)
 
         evidencia = EvidenciaCaso(
             id=identificador,
             registro_id=parse_id(registro_id),
             nombre=nombre,
-            ruta=f"{parse_id(registro_id)}/{nombre_interno}",
+            ruta=ruta,
             tipo=tipo,
             uploaded_by=usuario.id,
         )
@@ -220,7 +206,7 @@ async def subir_evidencia(
 
     except Exception:
         db.rollback()
-        ruta.unlink(missing_ok=True)
+        storage.eliminar(clave)
         raise
 
 
@@ -233,19 +219,18 @@ def obtener_archivo(
     ),
 ):
     evidencia = obtener_evidencia(db, evidencia_id)
-    ruta = ruta_privada(evidencia)
+    contenido = storage.leer(clave_storage(evidencia.ruta))
 
-    if not ruta.is_file():
+    if contenido is None:
         raise HTTPException(
             status_code=404,
             detail="Archivo no disponible",
         )
 
-    return FileResponse(
-        path=ruta,
-        media_type=evidencia.tipo,
-        filename=evidencia.nombre,
-        content_disposition_type="attachment",
+    return storage.respuesta_archivo(
+        contenido,
+        evidencia.nombre,
+        evidencia.tipo,
         headers={
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "private, no-store",
@@ -265,11 +250,11 @@ def eliminar_evidencia(
     ),
 ):
     evidencia = obtener_evidencia(db, evidencia_id)
-    ruta = ruta_privada(evidencia)
+    clave = clave_storage(evidencia.ruta)
 
     db.delete(evidencia)
     db.commit()
 
-    ruta.unlink(missing_ok=True)
+    storage.eliminar(clave)
 
     return None

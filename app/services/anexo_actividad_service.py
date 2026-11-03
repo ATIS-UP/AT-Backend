@@ -1,7 +1,7 @@
 """Service para Anexos de Actividades Institucionales"""
 import os
 import uuid
-import shutil
+import mimetypes
 from datetime import datetime
 from typing import List, Optional
 
@@ -10,9 +10,9 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
-from app.config import settings
 from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.anexo_actividad import AnexoActividad
+from app.utils import storage
 from app.utils.audit import AuditService
 
 
@@ -96,11 +96,8 @@ class AnexoActividadService:
         self._validate_file(file)
 
         relative_path = self._get_storage_path(file.filename)
-        absolute_path = os.path.join(settings.UPLOAD_BASE_PATH, relative_path)
-        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-
-        with open(absolute_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        content_type = mimetypes.guess_type(file.filename)[0] or "application/octet-stream"
+        storage.guardar(relative_path, file.file.read(), content_type)
 
         anexo = AnexoActividad(
             actividad_id=actividad_id,
@@ -168,18 +165,18 @@ class AnexoActividadService:
             "created_at": anexo.created_at.isoformat() if anexo.created_at else None,
         }
 
-    def descargar(self, anexo_id: str) -> str:
+    def descargar(self, anexo_id: str) -> bytes:
         anexo = self.db.query(AnexoActividad).filter(
             AnexoActividad.id == anexo_id
         ).first()
         if not anexo:
             raise EntityNotFoundError("AnexoActividad", anexo_id)
 
-        absolute_path = os.path.join(settings.UPLOAD_BASE_PATH, anexo.url)
-        if not os.path.exists(absolute_path):
+        contenido = storage.leer(anexo.url)
+        if contenido is None:
             raise EntityNotFoundError("AnexoActividad (archivo)", anexo_id)
 
-        return absolute_path
+        return contenido
 
     def eliminar(self, anexo_id: str, usuario_id: str, ip: str) -> None:
         anexo = self.db.query(AnexoActividad).filter(
@@ -188,9 +185,7 @@ class AnexoActividadService:
         if not anexo:
             raise EntityNotFoundError("AnexoActividad", anexo_id)
 
-        absolute_path = os.path.join(settings.UPLOAD_BASE_PATH, anexo.url)
-        if os.path.exists(absolute_path):
-            os.remove(absolute_path)
+        storage.eliminar(anexo.url)
 
         AuditService.log_eliminar(
             db=self.db,
