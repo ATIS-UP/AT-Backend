@@ -17,7 +17,7 @@ def get_service(db: Session = Depends(get_db)) -> AnexoActividadService:
 
 
 @router.post("/{actividad_id}/anexos", status_code=201)
-async def subir_anexo(
+def subir_anexo(
     actividad_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -41,7 +41,7 @@ async def listar_anexos(
 
 
 @router.get("/anexos/{anexo_id}/download")
-async def descargar_anexo(
+def descargar_anexo(
     anexo_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permiso("ver_actividades")),
@@ -54,7 +54,7 @@ async def descargar_anexo(
 
 
 @router.delete("/anexos/{anexo_id}", status_code=204)
-async def eliminar_anexo(
+def eliminar_anexo(
     anexo_id: str,
     db: Session = Depends(get_db),
     request: Request = None,

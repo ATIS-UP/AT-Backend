@@ -7,10 +7,14 @@ from pathlib import Path
 from urllib.parse import quote
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from fastapi import Response
 
 from app.config import settings
+
+# Sin esto boto3 espera 60 s por intento: un MinIO caído retendría cada petición minutos.
+_S3_CONFIG = Config(connect_timeout=5, read_timeout=30, retries={"max_attempts": 2})
 
 
 def _usa_s3() -> bool:
@@ -25,6 +29,7 @@ def _s3_client():
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         use_ssl=settings.MINIO_USE_SSL,
+        config=_S3_CONFIG,
     )
 
 

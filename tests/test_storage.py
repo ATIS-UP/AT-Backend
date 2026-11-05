@@ -86,6 +86,17 @@ class TestS3:
         s3.delete_object.assert_called_once_with(Bucket="bucket-test", Key=KEY)
 
 
+class TestClienteS3:
+    def test_usa_timeouts_cortos(self):
+        with patch("app.utils.storage.boto3.client") as cliente:
+            storage._s3_client()
+
+        config = cliente.call_args.kwargs["config"]
+        assert config.connect_timeout == 5
+        assert config.read_timeout == 30
+        assert config.retries["max_attempts"] == 2
+
+
 class TestRespuestaArchivo:
     def test_nombre_ascii(self):
         resp = storage.respuesta_archivo(b"x", "foto.png", "image/png")

@@ -116,7 +116,7 @@ def listar_evidencias(
     "/{registro_id}/evidencias",
     status_code=status.HTTP_201_CREATED,
 )
-async def subir_evidencia(
+def subir_evidencia(
     registro_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -156,7 +156,7 @@ async def subir_evidencia(
             detail="Solo se permiten imágenes JPG y PNG",
         )
 
-    contenido = await file.read(MAX_BYTES + 1)
+    contenido = file.file.read(MAX_BYTES + 1)
 
     if len(contenido) > MAX_BYTES:
         raise HTTPException(
