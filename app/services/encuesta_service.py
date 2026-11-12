@@ -204,7 +204,10 @@ class EncuestaService:
         self.db.refresh(encuesta)
         return self._to_dict(encuesta)
 
-    def registrar_respuesta(self, encuesta_id: str, estudiante_id: str, respuestas: list) -> dict:
+    def registrar_respuesta(
+        self, encuesta_id: str, estudiante_id: str, respuestas: list, usuario_id: Optional[str] = None,
+    ) -> dict:
+        """store a student's answers; usuario_id is set when staff registers it on the student's behalf."""
         encuesta = self._get_or_raise(encuesta_id)
         if encuesta.estado != "PUBLICADA":
             raise ValidationError("Solo se pueden responder encuestas en estado PUBLICADA")
@@ -223,6 +226,12 @@ class EncuestaService:
         self._validar_respuestas(encuesta.preguntas or [], respuestas)
         respuesta = RespuestaEncuesta(id=uuid.uuid4(), encuesta_id=encuesta.id, estudiante_id=estudiante_id, respuestas=respuestas)
         self.db.add(respuesta)
+        if usuario_id:
+            self.db.flush()
+            AuditService.log_crear(
+                db=self.db, usuario_id=usuario_id, entidad="RespuestaEncuesta", entidad_id=str(respuesta.id),
+                datos={"encuesta_id": str(encuesta.id), "estudiante_id": str(estudiante_id), "registrada_por_admin": True},
+            )
         self.db.commit()
         self.db.refresh(respuesta)
         return self._respuesta_to_dict(respuesta)

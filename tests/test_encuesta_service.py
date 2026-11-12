@@ -785,3 +785,51 @@ class TestEncuestaPublicaTelefono:
         with pytest.raises(ValidationError, match="teléfono"):
             service._validar_respuestas_campo(encuesta, [{"pregunta_id": 6, "valor": "300-abc-4567"}])
 
+
+class TestRegistrarRespuestaAdmin:
+    """admin endpoint registers the answer for the student in the body, not the logged-in user."""
+
+    def test_router_usa_estudiante_del_body(self):
+        import asyncio
+        from app.routers.encuestas import registrar_respuesta
+        from app.schemas.encuesta import RespuestaCreate
+
+        estudiante_id = uuid.uuid4()
+        user = MagicMock(id=uuid.uuid4())
+        data = RespuestaCreate(estudiante_id=estudiante_id, respuestas=[{"pregunta_id": 1, "valor": "x"}])
+        with patch("app.routers.encuestas.EncuestaService") as svc_cls:
+            asyncio.run(registrar_respuesta("enc-1", data, MagicMock(), MagicMock(), user))
+
+        svc_cls.return_value.registrar_respuesta.assert_called_once_with(
+            "enc-1", str(estudiante_id), [{"pregunta_id": 1, "valor": "x"}], usuario_id=str(user.id),
+        )
+
+    def test_schema_exige_estudiante_id(self):
+        from pydantic import ValidationError as PydanticValidationError
+        from app.schemas.encuesta import RespuestaCreate
+        with pytest.raises(PydanticValidationError):
+            RespuestaCreate(respuestas=[])
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_audita_cuando_lo_registra_un_usuario(self, mock_audit):
+        db = MagicMock()
+        service = EncuestaService(db)
+        encuesta = _make_encuesta(estado="PUBLICADA")
+
+        def query_side_effect(model):
+            mock = MagicMock()
+            if model.__tablename__ == "encuestas":
+                mock.filter.return_value.first.return_value = encuesta
+            elif model.__tablename__ == "estudiantes":
+                mock.filter.return_value.first.return_value = MagicMock(estado="ACTIVO")
+            else:
+                mock.filter.return_value.first.return_value = None
+            return mock
+
+        db.query.side_effect = query_side_effect
+        db.refresh.side_effect = lambda obj: setattr(obj, "created_at", datetime(2025, 1, 2))
+
+        service.registrar_respuesta(str(encuesta.id), "est-1", [], usuario_id="admin-1")
+        kwargs = mock_audit.log_crear.call_args.kwargs
+        assert kwargs["usuario_id"] == "admin-1"
+        assert kwargs["datos"]["estudiante_id"] == "est-1"

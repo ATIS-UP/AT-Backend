@@ -1,6 +1,7 @@
 """schemas for survey (encuesta) endpoints"""
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, Field
 
 
@@ -52,6 +53,7 @@ class EncuestaListResponse(BaseModel):
 
 
 class RespuestaCreate(BaseModel):
+    estudiante_id: UUID = Field(description="Estudiante en cuyo nombre se registra la respuesta")
     respuestas: list[dict]
 
 

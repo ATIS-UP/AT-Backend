@@ -225,8 +225,9 @@ async def duplicar_encuesta(
 
 @router.post("/{encuesta_id}/respuestas",
     summary="Registrar respuesta (admin)",
-    description="Registra una respuesta a una encuesta PUBLICADA desde el panel admin. "
-                "Requiere permiso 'responder_encuesta'. Para respuestas públicas usar "
+    description="Registra, en nombre del estudiante indicado en `estudiante_id`, una respuesta "
+                "a una encuesta PUBLICADA desde el panel admin. Queda auditada con el usuario que "
+                "la registra. Requiere permiso 'responder_encuesta'. Para respuestas públicas usar "
                 "POST /{encuesta_id}/responder-publico.")
 async def registrar_respuesta(
     encuesta_id: str, respuesta_data: RespuestaCreate,
@@ -234,7 +235,10 @@ async def registrar_respuesta(
     current_user: User = Depends(require_permiso("responder_encuesta")),
 ):
     service = EncuestaService(db)
-    return service.registrar_respuesta(encuesta_id, str(current_user.id), respuesta_data.respuestas)
+    return service.registrar_respuesta(
+        encuesta_id, str(respuesta_data.estudiante_id), respuesta_data.respuestas,
+        usuario_id=str(current_user.id),
+    )
 
 
 @router.get("/{encuesta_id}/resultados", response_model=EncuestaResultados,
