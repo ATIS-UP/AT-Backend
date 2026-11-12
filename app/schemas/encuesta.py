@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class PreguntaEncuesta(BaseModel):
     id: Optional[int] = None
     texto: str
-    tipo: str  # opcion_multiple, texto_libre, escala_likert, ABIERTA
+    tipo: str  # opcion_multiple, opcion_multiple_multi, texto_libre, escala_likert, fecha (DD/MM/AAAA), ABIERTA
     opciones: Optional[list[str]] = None
     requerida: bool = True
     campo: Optional[str] = None

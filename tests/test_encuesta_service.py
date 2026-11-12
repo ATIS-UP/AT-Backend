@@ -679,3 +679,109 @@ class TestEncuestaServiceDuplicar:
         added_obj = db.add.call_args[0][0]
         assert isinstance(added_obj, Encuesta)
         assert added_obj.estado == "BORRADOR"
+
+
+class TestEncuestaValidacionRespuestas:
+    """tests for required questions and fecha (DD/MM/AAAA) validation."""
+
+    PREGUNTAS = [
+        {"id": 1, "texto": "Nombre", "tipo": "texto_libre", "requerida": True},
+        {"id": 2, "texto": "Comentario", "tipo": "texto_libre", "requerida": False},
+        {"id": 3, "texto": "Nacimiento", "tipo": "fecha", "requerida": False},
+        {"id": 4, "texto": "Programa", "tipo": "texto_libre", "requerida": True, "editable": False},
+        {"id": 5, "texto": "Intereses", "tipo": "opcion_multiple_multi", "opciones": ["A", "B"]},
+    ]
+
+    def _validar(self, respuestas):
+        EncuestaService(MagicMock())._validar_respuestas(self.PREGUNTAS, respuestas)
+
+    def test_respuestas_completas_ok(self):
+        self._validar([
+            {"pregunta_id": 1, "valor": "correo@unipamplona.edu.co - ok"},
+            {"pregunta_id": 3, "valor": "15/03/2004"},
+            {"pregunta_id": 5, "valor": ["A"]},
+        ])
+
+    def test_obligatoria_vacia_raises(self):
+        with pytest.raises(ValidationError, match="pregunta 1 es obligatoria"):
+            self._validar([{"pregunta_id": 1, "valor": "   "}, {"pregunta_id": 5, "valor": ["A"]}])
+
+    def test_obligatoria_por_defecto_multi_vacia_raises(self):
+        with pytest.raises(ValidationError, match="pregunta 5 es obligatoria"):
+            self._validar([{"pregunta_id": 1, "valor": "x"}, {"pregunta_id": 5, "valor": []}])
+
+    def test_no_editable_no_se_exige(self):
+        self._validar([{"pregunta_id": 1, "valor": "x"}, {"pregunta_id": 5, "valor": ["B"]}])
+
+    @pytest.mark.parametrize("valor", ["2004-03-15", "31/02/2024", "1/3/2004", "15/13/2004", "hoy"])
+    def test_fecha_invalida_raises(self, valor):
+        with pytest.raises(ValidationError, match="DD/MM/AAAA"):
+            self._validar([
+                {"pregunta_id": 1, "valor": "x"},
+                {"pregunta_id": 3, "valor": valor},
+                {"pregunta_id": 5, "valor": ["A"]},
+            ])
+
+    def test_crear_acepta_tipo_fecha(self):
+        EncuestaService(MagicMock())._validar_preguntas([{"texto": "Fecha", "tipo": "fecha"}])
+
+    @patch("app.services.encuesta_service.AuditService")
+    def test_registrar_respuesta_sin_obligatoria_no_guarda(self, mock_audit):
+        db = MagicMock()
+        service = EncuestaService(db)
+        encuesta = _make_encuesta(estado="PUBLICADA", preguntas=self.PREGUNTAS)
+
+        def query_side_effect(model):
+            mock = MagicMock()
+            if model.__tablename__ == "encuestas":
+                mock.filter.return_value.first.return_value = encuesta
+            elif model.__tablename__ == "estudiantes":
+                mock.filter.return_value.first.return_value = MagicMock(estado="ACTIVO")
+            else:
+                mock.filter.return_value.first.return_value = None
+            return mock
+
+        db.query.side_effect = query_side_effect
+        with pytest.raises(ValidationError):
+            service.registrar_respuesta(str(encuesta.id), str(uuid.uuid4()), [])
+        assert not db.add.called
+
+    def test_resultados_fecha_como_texto(self):
+        db = MagicMock()
+        service = EncuestaService(db)
+        encuesta = _make_encuesta(estado="CERRADA", preguntas=[{"id": 1, "texto": "F", "tipo": "fecha"}])
+        resp = _make_respuesta(encuesta.id, "e1", [{"pregunta_id": 1, "valor": "01/02/2003"}])
+
+        def query_side_effect(model):
+            mock = MagicMock()
+            mock.filter.return_value.first.return_value = encuesta
+            mock.filter.return_value.all.return_value = [resp]
+            return mock
+
+        db.query.side_effect = query_side_effect
+        result = service.obtener_resultados(str(encuesta.id))
+        assert result["resultados_por_pregunta"][0]["respuestas_texto"] == ["01/02/2003"]
+
+
+class TestEncuestaPublicaTelefono:
+    """phone numbers with separators are accepted and stored as digits."""
+
+    def test_telefono_con_guiones_valido_y_normalizado(self):
+        from app.services.encuesta_publica_service import EncuestaPublicaService
+        service = EncuestaPublicaService(MagicMock())
+        encuesta = _make_encuesta(preguntas=[{"id": 6, "texto": "Tel", "tipo": "texto_libre", "campo": "telefono", "editable": True}])
+        respuestas = [{"pregunta_id": 6, "valor": "300-123 4567"}]
+        service._validar_respuestas_campo(encuesta, respuestas)
+
+        estudiante = MagicMock()
+        with patch("app.services.encuesta_publica_service.encrypt_data", side_effect=lambda v: f"enc:{v}"):
+            service._actualizar_estudiante_desde_respuestas(estudiante, encuesta, respuestas)
+        assert estudiante.telefono == "enc:3001234567"
+
+    def test_telefono_con_letras_raises(self):
+        from app.services.encuesta_publica_service import EncuestaPublicaService
+        service = EncuestaPublicaService(MagicMock())
+        encuesta = _make_encuesta(preguntas=[{"id": 6, "texto": "Tel", "tipo": "texto_libre", "campo": "telefono", "editable": True}])
+        with pytest.raises(ValidationError, match="teléfono"):
+            service._validar_respuestas_campo(encuesta, [{"pregunta_id": 6, "valor": "300-abc-4567"}])
+

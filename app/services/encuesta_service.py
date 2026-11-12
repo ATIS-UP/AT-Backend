@@ -1,4 +1,5 @@
 """service layer for survey admin management (CRUD, publishing, results)."""
+import re
 import uuid
 from datetime import datetime
 from datetime import UTC as tz_utc
@@ -10,6 +11,31 @@ from app.exceptions import EntityNotFoundError, ValidationError, DuplicateEntity
 from app.models.alerta import Encuesta, RespuestaEncuesta
 from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.utils.audit import AuditService
+
+TIPOS_PREGUNTA = {"opcion_multiple", "opcion_multiple_multi", "texto_libre", "escala_likert", "fecha", "ABIERTA"}
+TIPOS_TEXTO = ("texto_libre", "fecha")
+_FECHA_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
+
+
+def es_fecha_valida(valor) -> bool:
+    """true when valor is a real calendar date in DD/MM/AAAA format."""
+    if not isinstance(valor, str) or not _FECHA_RE.match(valor.strip()):
+        return False
+    try:
+        datetime.strptime(valor.strip(), "%d/%m/%Y")
+    except ValueError:
+        return False
+    return True
+
+
+def _es_vacio(valor) -> bool:
+    if valor is None:
+        return True
+    if isinstance(valor, str):
+        return not valor.strip()
+    if isinstance(valor, list):
+        return len(valor) == 0
+    return False
 
 
 class EncuestaService:
@@ -194,6 +220,7 @@ class EncuestaService:
         )
         if existing:
             raise DuplicateEntityError(entity="RespuestaEncuesta", field="estudiante_id", value=estudiante_id)
+        self._validar_respuestas(encuesta.preguntas or [], respuestas)
         respuesta = RespuestaEncuesta(id=uuid.uuid4(), encuesta_id=encuesta.id, estudiante_id=estudiante_id, respuestas=respuestas)
         self.db.add(respuesta)
         self.db.commit()
@@ -245,7 +272,7 @@ class EncuestaService:
                     distribucion[str(int(v))] = distribucion.get(str(int(v)), 0) + 1
                 resultado["promedio"] = promedio
                 resultado["distribucion"] = distribucion
-            elif tipo == "texto_libre":
+            elif tipo in TIPOS_TEXTO:
                 resultado["respuestas_texto"] = answers
                 resultado["distribucion"] = None
                 resultado["promedio"] = None
@@ -265,19 +292,34 @@ class EncuestaService:
         return encuesta
 
     def _validar_preguntas(self, preguntas: list) -> None:
-        tipos_validos = {"opcion_multiple", "opcion_multiple_multi", "texto_libre", "escala_likert", "ABIERTA"}
         for i, pregunta in enumerate(preguntas):
             if not isinstance(pregunta, dict):
                 raise ValidationError(f"La pregunta en posicion {i} debe ser un objeto")
             if "texto" not in pregunta:
                 raise ValidationError(f"La pregunta en posicion {i} debe tener un campo 'texto'")
             tipo = pregunta.get("tipo", "texto_libre")
-            if tipo not in tipos_validos:
-                raise ValidationError(f"Tipo de pregunta invalido: '{tipo}'. Tipos validos: {', '.join(sorted(tipos_validos))}")
+            if tipo not in TIPOS_PREGUNTA:
+                raise ValidationError(f"Tipo de pregunta invalido: '{tipo}'. Tipos validos: {', '.join(sorted(TIPOS_PREGUNTA))}")
             if tipo == "opcion_multiple":
                 opciones = pregunta.get("opciones")
                 if not opciones or not isinstance(opciones, list) or len(opciones) < 2:
                     raise ValidationError(f"La pregunta en posicion {i} de tipo {tipo} debe tener al menos 2 opciones")
+
+    def _validar_respuestas(self, preguntas: list, respuestas: list) -> None:
+        """enforce required questions and per-type formats (fecha -> DD/MM/AAAA)."""
+        if not isinstance(respuestas, list):
+            raise ValidationError("El formato de las respuestas no es válido")
+        valores = {r.get("pregunta_id"): r.get("valor") for r in respuestas if isinstance(r, dict)}
+        for num, pregunta in enumerate(preguntas, start=1):
+            if not isinstance(pregunta, dict) or pregunta.get("editable", True) is False:
+                continue
+            valor = valores.get(pregunta.get("id"))
+            if _es_vacio(valor):
+                if pregunta.get("requerida", True):
+                    raise ValidationError(f"La pregunta {num} es obligatoria")
+                continue
+            if pregunta.get("tipo") == "fecha" and not es_fecha_valida(valor):
+                raise ValidationError(f"La pregunta {num} debe ser una fecha válida con formato DD/MM/AAAA")
 
     def _to_dict(self, encuesta: Encuesta) -> dict:
         return {

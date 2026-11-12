@@ -1,4 +1,5 @@
 """service layer for public survey endpoints (no auth required)."""
+import re
 import uuid
 from datetime import datetime
 from datetime import UTC as tz_utc
@@ -42,13 +43,23 @@ SMMLV_RANGOS = {
     "mas_5": {"label": "Más de 5 SMMLV (+$6.500.000)", "valor_promedio": 7800000},
 }
 
+_SEPARADORES_TELEFONO = re.compile(r"[\s\-.()]")
+
+
+def _normalizar_valor(campo: str, valor):
+    """strip common separators so '300-123 4567' is stored as '3001234567'."""
+    if campo == "telefono" and isinstance(valor, str):
+        return _SEPARADORES_TELEFONO.sub("", valor)
+    return valor
+
+
 CAMPO_ERROR_MSG = {
     "estrato": "Debe seleccionar un estrato válido (1 a 6)",
     "genero": "Debe seleccionar un género válido (H, M u OTRO)",
     "procedencia": "Debe seleccionar una procedencia válida (LOCAL o FORANEO)",
     "semestre": "Semestre debe ser un número entre 1 y 12",
     "email": "El correo electrónico no es válido",
-    "telefono": "El teléfono solo debe contener dígitos (7 a 15 caracteres)",
+    "telefono": "El teléfono debe tener entre 7 y 15 dígitos (se permiten guiones y espacios)",
     "ingreso_familiar": "Debe seleccionar un rango de ingreso válido",
     "programa": "El programa académico excede la longitud máxima",
 }
@@ -253,9 +264,9 @@ class EncuestaPublicaService:
             pregunta = preguntas.get(pid, {})
             campo = pregunta.get("campo")
             editable = pregunta.get("editable", True)
-            valor_nuevo = r.get("valor")
             if not campo or not editable:
                 continue
+            valor_nuevo = _normalizar_valor(campo, r.get("valor"))
             if valor_nuevo is None or (isinstance(valor_nuevo, str) and not valor_nuevo.strip()):
                 continue
             if campo in CAMPO_VALIDACION:
@@ -272,9 +283,9 @@ class EncuestaPublicaService:
             pregunta = preguntas.get(pid, {})
             campo = pregunta.get("campo")
             editable = pregunta.get("editable", True)
-            valor_nuevo = r.get("valor")
             if not campo or not editable:
                 continue
+            valor_nuevo = _normalizar_valor(campo, r.get("valor"))
             if valor_nuevo is None or (isinstance(valor_nuevo, str) and not valor_nuevo.strip()):
                 continue
             if campo in CAMPO_VALIDACION:
