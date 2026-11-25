@@ -27,11 +27,12 @@ async def listar_actividades(
     por_pagina: int = Query(20, ge=1, le=100),
     tipo: Optional[str] = None,
     estado: Optional[str] = None,
+    buscar: Optional[str] = Query(None, max_length=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permiso("ver_actividades"))
 ):
     service = get_service(db)
-    actividades, total = service.listar(pagina, por_pagina, estado, tipo)
+    actividades, total = service.listar(pagina, por_pagina, estado, tipo, buscar)
     return {
         "actividades": actividades,
         "total": total,

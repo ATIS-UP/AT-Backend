@@ -1,6 +1,8 @@
 """Service para Actividades Institucionales"""
+from datetime import UTC as tz_utc, datetime, timedelta, timezone
 from typing import Optional, Tuple, List
 from uuid import UUID
+from sqlalchemy import case, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.actividad_institucional import (
@@ -14,6 +16,33 @@ from app.schemas.actividad_institucional import (
     ActividadInstitucionalUpdate,
     ActividadInstitucionalResponse,
 )
+from app.utils.security import sanitize_like_param
+
+# Las fechas de actividades son hora de pared de Colombia (TIMESTAMP sin zona).
+# Colombia es UTC-5 todo el año (sin horario de verano); se usa un desfase fijo
+# porque la imagen python:slim no trae tzdata para ZoneInfo("America/Bogota").
+HORA_COLOMBIA = timezone(timedelta(hours=-5), "America/Bogota")
+
+# Una actividad cancelada o finalizada no es "próxima" aunque su fecha no haya pasado.
+ESTADOS_CERRADOS = (EstadoActividadInstitucional.CANCELADA, EstadoActividadInstitucional.FINALIZADA)
+
+
+def ahora_colombia() -> datetime:
+    """hora actual de Colombia sin tzinfo, comparable con las columnas de fecha."""
+    return datetime.now(tz_utc).astimezone(HORA_COLOMBIA).replace(tzinfo=None)
+
+
+def orden_proximas_primero(ahora: datetime) -> list:
+    """próximas/en curso primero (la más cercana arriba), luego pasadas (la más reciente arriba)."""
+    es_proxima = (ActividadInstitucional.fecha_fin >= ahora) & ActividadInstitucional.estado.notin_(ESTADOS_CERRADOS)
+    grupo = case((es_proxima, 0), else_=1)
+    return [
+        grupo,
+        case((es_proxima, ActividadInstitucional.fecha_inicio)).asc(),
+        ActividadInstitucional.fecha_inicio.desc(),
+        ActividadInstitucional.created_at.desc(),
+        ActividadInstitucional.id,  # desempate estable para que la paginación no repita filas
+    ]
 
 
 class ActividadInstitucionalService:
@@ -41,7 +70,14 @@ class ActividadInstitucionalService:
             updated_at=actividad.updated_at,
         )
 
-    def listar(self, pagina: int = 1, por_pagina: int = 20, estado: Optional[str] = None, tipo: Optional[str] = None) -> Tuple[List[ActividadInstitucionalResponse], int]:
+    def listar(
+        self,
+        pagina: int = 1,
+        por_pagina: int = 20,
+        estado: Optional[str] = None,
+        tipo: Optional[str] = None,
+        buscar: Optional[str] = None,
+    ) -> Tuple[List[ActividadInstitucionalResponse], int]:
         query = self.db.query(ActividadInstitucional).options(
             joinedload(ActividadInstitucional.creador),
             joinedload(ActividadInstitucional.archivos_anexos),
@@ -52,8 +88,23 @@ class ActividadInstitucionalService:
         if tipo:
             query = query.filter(ActividadInstitucional.tipo == TipoActividadInstitucional(tipo))
 
+        termino = buscar.strip() if buscar else ""
+        if termino:
+            # estas columnas no estan cifradas: se puede filtrar en SQL
+            patron = f"%{sanitize_like_param(termino)}%"
+            query = query.filter(or_(
+                ActividadInstitucional.descripcion.ilike(patron),
+                ActividadInstitucional.encargado.ilike(patron),
+                ActividadInstitucional.lugar_enlace.ilike(patron),
+            ))
+
         total = query.count()
-        actividades = query.order_by(ActividadInstitucional.created_at.desc()).offset((pagina - 1) * por_pagina).limit(por_pagina).all()
+        actividades = (
+            query.order_by(*orden_proximas_primero(ahora_colombia()))
+            .offset((pagina - 1) * por_pagina)
+            .limit(por_pagina)
+            .all()
+        )
 
         return [self._to_response(a) for a in actividades], total
 
