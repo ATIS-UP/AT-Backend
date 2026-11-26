@@ -10,11 +10,13 @@ from app.models.caso_especial import (
     TipoRegistroCaso, EstadoRegistroCaso, AccionHistorial
 )
 from app.models.estudiante import Estudiante, EstadoEstudiante
+from app.models.evidencia_caso import EvidenciaCaso, clave_storage
 from app.models.novedad_caso import NovedadCaso
 from app.schemas.caso_especial import (
     RegistroCasoCreate, RegistroCasoUpdate,
     RegistroCasoResponse, EstudianteInfo, NovedadInfo
 )
+from app.utils import storage
 from app.utils.security import decrypt_data
 
 
@@ -260,10 +262,21 @@ class CasoEspecialService:
         
         if not registro:
             return False
-        
+
+        # El CASCADE de la BD borra las filas de evidencias, pero no los archivos.
+        claves = [
+            clave_storage(ruta)
+            for (ruta,) in self.db.query(EvidenciaCaso.ruta).filter(
+                EvidenciaCaso.registro_id == registro.id
+            ).all()
+        ]
+
         self.db.delete(registro)
         self.db.commit()
-        
+
+        for clave in claves:
+            storage.eliminar(clave)
+
         return True
 
     def listar(self, pagina: int = 1, por_pagina: int = 20, estado: Optional[str] = None, tipo: Optional[str] = None) -> Tuple[List[RegistroCasoResponse], int]:

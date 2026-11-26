@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import (
     APIRouter, Depends, File, HTTPException,
-    UploadFile, status,
+    Request, UploadFile, status,
 )
 from sqlalchemy.orm import Session
 
@@ -14,8 +14,9 @@ from app.database import get_db
 from app.dependencies import require_permiso
 from app.models.user import User
 from app.models.caso_especial import RegistroCasoEspecial
-from app.models.evidencia_caso import EvidenciaCaso
+from app.models.evidencia_caso import EvidenciaCaso, clave_storage
 from app.utils import storage
+from app.utils.audit import AuditService
 
 
 router = APIRouter(
@@ -25,9 +26,6 @@ router = APIRouter(
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_IMAGES = 10
-
-# evidencia.ruta es relativa a este prefijo ("<registro_id>/<archivo>").
-PREFIJO_STORAGE = "uploads/evidencias_casos"
 
 
 def parse_id(value: str):
@@ -83,8 +81,8 @@ def obtener_evidencia(db: Session, evidencia_id: str):
     return evidencia
 
 
-def clave_storage(ruta: str) -> str:
-    return f"{PREFIJO_STORAGE}/{ruta}"
+def ip_cliente(request: Request | None) -> str:
+    return request.client.host if request and request.client else "0.0.0.0"
 
 
 @router.get("/{registro_id}/evidencias")
@@ -118,6 +116,7 @@ def listar_evidencias(
 )
 def subir_evidencia(
     registro_id: str,
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     usuario: User = Depends(
@@ -199,6 +198,16 @@ def subir_evidencia(
         )
 
         db.add(evidencia)
+
+        # Sin el nombre original: en casos especiales puede incluir datos del estudiante.
+        AuditService.log_crear(
+            db=db,
+            usuario_id=str(usuario.id),
+            entidad="EvidenciaCaso",
+            entidad_id=str(identificador),
+            datos={"registro_id": str(parse_id(registro_id)), "tipo": tipo, "bytes": len(contenido)},
+            ip=ip_cliente(request),
+        )
         db.commit()
         db.refresh(evidencia)
 
@@ -244,6 +253,7 @@ def obtener_archivo(
 )
 def eliminar_evidencia(
     evidencia_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     usuario: User = Depends(
         require_permiso("editar_registro_caso")
@@ -252,6 +262,14 @@ def eliminar_evidencia(
     evidencia = obtener_evidencia(db, evidencia_id)
     clave = clave_storage(evidencia.ruta)
 
+    AuditService.log_eliminar(
+        db=db,
+        usuario_id=str(usuario.id),
+        entidad="EvidenciaCaso",
+        entidad_id=str(evidencia.id),
+        datos_eliminados={"registro_id": str(evidencia.registro_id), "tipo": evidencia.tipo},
+        ip=ip_cliente(request),
+    )
     db.delete(evidencia)
     db.commit()
 

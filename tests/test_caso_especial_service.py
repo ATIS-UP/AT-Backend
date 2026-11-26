@@ -2,13 +2,13 @@
 
 import uuid
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from app.exceptions import EntityNotFoundError, ValidationError
 from app.models.caso_especial import (
-    TipoRegistroCaso, EstadoRegistroCaso, AccionHistorial
+    RegistroCasoEspecial, TipoRegistroCaso, EstadoRegistroCaso, AccionHistorial
 )
 from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.services.caso_especial_service import CasoEspecialService
@@ -395,3 +395,42 @@ class TestCasoEspecialServiceBuscarEstudiantes:
         assert total == 1
         assert resultados[0]["estudiante"].id == str(estudiantes[550].id)
         estudiantes_q.filter.return_value.order_by.return_value.limit.assert_not_called()
+
+
+class TestCasoEspecialServiceEliminar:
+    """borrar un caso debe borrar también sus fotos de storage, después del commit."""
+
+    def _db(self, registro, rutas):
+        registros_q = MagicMock()
+        registros_q.filter.return_value.first.return_value = registro
+        evidencias_q = MagicMock()
+        evidencias_q.filter.return_value.all.return_value = [(r,) for r in rutas]
+        db = MagicMock()
+        db.query.side_effect = lambda model: registros_q if model is RegistroCasoEspecial else evidencias_q
+        return db
+
+    @patch("app.services.caso_especial_service.storage")
+    def test_eliminar_borra_fotos_despues_del_commit(self, storage):
+        registro = _make_registro()
+        db = self._db(registro, [f"{registro.id}/a.png", f"{registro.id}/b.jpg"])
+        orden = MagicMock()
+        orden.attach_mock(db.commit, "commit")
+        orden.attach_mock(storage.eliminar, "eliminar")
+
+        assert CasoEspecialService(db).eliminar(str(registro.id)) is True
+
+        db.delete.assert_called_once_with(registro)
+        assert orden.mock_calls == [
+            call.commit(),
+            call.eliminar(f"uploads/evidencias_casos/{registro.id}/a.png"),
+            call.eliminar(f"uploads/evidencias_casos/{registro.id}/b.jpg"),
+        ]
+
+    @patch("app.services.caso_especial_service.storage")
+    def test_eliminar_inexistente_no_toca_storage(self, storage):
+        db = self._db(None, [])
+
+        assert CasoEspecialService(db).eliminar(str(uuid.uuid4())) is False
+
+        db.delete.assert_not_called()
+        storage.eliminar.assert_not_called()

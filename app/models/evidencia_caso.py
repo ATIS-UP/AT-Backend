@@ -10,6 +10,14 @@ from sqlalchemy.sql import func
 
 from app.database import Base
 
+# EvidenciaCaso.ruta es relativa a este prefijo ("<registro_id>/<archivo>").
+PREFIJO_STORAGE = "uploads/evidencias_casos"
+
+
+def clave_storage(ruta: str) -> str:
+    """Clave del archivo en storage a partir de EvidenciaCaso.ruta."""
+    return f"{PREFIJO_STORAGE}/{ruta}"
+
 
 class EvidenciaCaso(Base):
     __tablename__ = "evidencias_casos"
