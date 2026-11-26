@@ -8,6 +8,10 @@ from app.dependencies import require_permiso
 from app.models.user import User
 from app.models.estudiante import Estudiante, EstadoEstudiante
 from app.models.alerta import Alerta, NivelRiesgo, EstadoSeguimiento
+from app.models.caso_especial import (
+    RegistroCasoEspecial,
+    EstadoRegistroCaso,
+)
 from app.utils.security import decrypt_data
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -28,6 +32,22 @@ async def get_resumen(
     pendientes = db.query(Alerta).filter(Alerta.estado_seguimiento == EstadoSeguimiento.PENDIENTE).count()
     en_proceso = db.query(Alerta).filter(Alerta.estado_seguimiento == EstadoSeguimiento.EN_PROCESO).count()
     resueltas = db.query(Alerta).filter(Alerta.estado_seguimiento == EstadoSeguimiento.RESUELTO).count()
+
+    # Indicadores obtenidos de los casos especiales existentes
+    total_casos_especiales = db.query(RegistroCasoEspecial).count()
+
+    casos_pendientes = db.query(RegistroCasoEspecial).filter(
+        RegistroCasoEspecial.estado == EstadoRegistroCaso.PENDIENTE
+    ).count()
+
+    casos_en_proceso = db.query(RegistroCasoEspecial).filter(
+        RegistroCasoEspecial.estado == EstadoRegistroCaso.ACTIVO
+    ).count()
+
+    casos_resueltos = db.query(RegistroCasoEspecial).filter(
+        RegistroCasoEspecial.estado == EstadoRegistroCaso.CERRADO
+    ).count()
+
 
     programas = db.query(
         Estudiante.programa,
@@ -54,6 +74,12 @@ async def get_resumen(
             "pendientes": pendientes,
             "en_proceso": en_proceso,
             "resueltas": resueltas
+        },
+        "casos_especiales": {
+            "total": total_casos_especiales,
+            "pendientes": casos_pendientes,
+            "en_proceso": casos_en_proceso,
+            "resueltas": casos_resueltos
         },
         "programas": programas_dist,
         "tendencias": tendencias
@@ -125,3 +151,41 @@ async def get_recientes(
         })
 
     return {"alertas_recientes": resultados}
+
+@router.get("/casos-recientes")
+async def get_casos_recientes(
+    request: Request,
+    pagina: int = Query(1, ge=1),
+    por_pagina: int = Query(6, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permiso("ver_dashboard")),
+):
+    """Lista paginada de casos especiales para el Dashboard."""
+    from app.services.caso_especial_service import CasoEspecialService
+
+    servicio = CasoEspecialService(db)
+    registros, total = servicio.listar(
+        pagina=pagina,
+        por_pagina=por_pagina
+    )
+
+    return {
+        "total": total,
+        "pagina": pagina,
+        "por_pagina": por_pagina,
+        "casos": [
+            {
+                "id": registro.id,
+                "estudiante_id": registro.estudiante_id,
+                "estudiante_nombre": (
+                    f"{registro.estudiante.nombres} {registro.estudiante.apellidos}"
+                    if registro.estudiante else None
+                ),
+                "tipo": registro.tipo,
+                "estado": registro.estado,
+                "responsable_nombre": registro.responsable_nombre,
+                "created_at": registro.created_at,
+            }
+            for registro in registros
+        ],
+    }
