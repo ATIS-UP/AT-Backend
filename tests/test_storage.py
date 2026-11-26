@@ -3,12 +3,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError
+from cryptography.fernet import Fernet
 
 from app.config import settings
 from app.utils import storage
 
 
 KEY = "uploads/evidencias_casos/reg-1/foto.png"
+PNG = b"\x89PNG\r\n\x1a\n" + b"contenido de la foto"
 
 
 @pytest.fixture
@@ -32,11 +34,26 @@ def _client_error(code: str) -> ClientError:
 
 
 class TestLocal:
-    def test_guardar_y_leer(self, local):
-        storage.guardar(KEY, b"datos", "image/png")
+    def test_guardar_cifra_y_leer_descifra(self, local):
+        storage.guardar(KEY, PNG, "image/png")
 
-        assert (local / KEY).read_bytes() == b"datos"
-        assert storage.leer(KEY) == b"datos"
+        en_disco = (local / KEY).read_bytes()
+        assert en_disco.startswith(storage.PREFIJO_CIFRADO)
+        assert b"contenido de la foto" not in en_disco
+        assert storage.leer(KEY) == PNG
+
+    def test_lee_archivo_viejo_sin_cifrar(self, local):
+        (local / KEY).parent.mkdir(parents=True)
+        (local / KEY).write_bytes(PNG)
+
+        assert storage.leer(KEY) == PNG
+
+    def test_clave_distinta_da_error(self, local, monkeypatch):
+        storage.guardar(KEY, PNG, "image/png")
+        monkeypatch.setattr(storage, "fernet", Fernet(Fernet.generate_key()))
+
+        with pytest.raises(RuntimeError):
+            storage.leer(KEY)
 
     def test_leer_inexistente_devuelve_none(self, local):
         assert storage.leer(KEY) is None
@@ -54,18 +71,27 @@ class TestLocal:
 
 
 class TestS3:
-    def test_guardar_usa_put_object(self, s3):
-        storage.guardar(KEY, b"datos", "image/png")
+    def test_guardar_sube_cifrado(self, s3):
+        storage.guardar(KEY, PNG, "image/png")
 
-        s3.put_object.assert_called_once_with(
-            Bucket="bucket-test", Key=KEY, Body=b"datos", ContentType="image/png",
-        )
+        kwargs = s3.put_object.call_args.kwargs
+        assert kwargs["Bucket"] == "bucket-test"
+        assert kwargs["Key"] == KEY
+        assert kwargs["ContentType"] == "image/png"
+        assert kwargs["Body"].startswith(storage.PREFIJO_CIFRADO)
+        assert b"contenido de la foto" not in kwargs["Body"]
 
-    def test_leer(self, s3):
-        s3.get_object.return_value = {"Body": MagicMock(read=lambda: b"datos")}
+    def test_leer_descifra(self, s3):
+        cifrado = storage._cifrar(PNG)
+        s3.get_object.return_value = {"Body": MagicMock(read=lambda: cifrado)}
 
-        assert storage.leer(KEY) == b"datos"
+        assert storage.leer(KEY) == PNG
         s3.get_object.assert_called_once_with(Bucket="bucket-test", Key=KEY)
+
+    def test_leer_archivo_viejo_sin_cifrar(self, s3):
+        s3.get_object.return_value = {"Body": MagicMock(read=lambda: PNG)}
+
+        assert storage.leer(KEY) == PNG
 
     def test_leer_inexistente_devuelve_none(self, s3):
         s3.get_object.side_effect = _client_error("NoSuchKey")

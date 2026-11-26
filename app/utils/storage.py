@@ -2,16 +2,27 @@
 
 Las claves son rutas relativas con "/" (p. ej. "uploads/anexos_actividades/2026/06/x.png").
 En local se resuelven contra UPLOAD_BASE_PATH; en S3 se usan tal cual como Key del bucket.
+
+El contenido se guarda cifrado con la FERNET_KEY y lleva el prefijo PREFIJO_CIFRADO.
+Los archivos sin ese prefijo (subidos antes del cifrado) se leen tal cual.
 """
+import logging
 from pathlib import Path
 from urllib.parse import quote
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from cryptography.fernet import InvalidToken
 from fastapi import Response
 
 from app.config import settings
+from app.utils.security import fernet
+
+logger = logging.getLogger(__name__)
+
+# Marca los archivos cifrados; el número es la versión del formato.
+PREFIJO_CIFRADO = b"SATISENC1:"
 
 # Sin esto boto3 espera 60 s por intento: un MinIO caído retendría cada petición minutos.
 _S3_CONFIG = Config(connect_timeout=5, read_timeout=30, retries={"max_attempts": 2})
@@ -41,7 +52,23 @@ def _ruta_local(key: str) -> Path:
     return ruta
 
 
+def _cifrar(contenido: bytes) -> bytes:
+    return PREFIJO_CIFRADO + fernet.encrypt(contenido)
+
+
+def _descifrar(key: str, almacenado: bytes) -> bytes:
+    if not almacenado.startswith(PREFIJO_CIFRADO):
+        return almacenado  # archivo anterior al cifrado
+    try:
+        return fernet.decrypt(almacenado[len(PREFIJO_CIFRADO):])
+    except InvalidToken:
+        logger.error("No se pudo descifrar %s: la FERNET_KEY no coincide o el archivo está dañado", key)
+        raise RuntimeError(f"no se pudo descifrar el archivo {key}")
+
+
 def guardar(key: str, contenido: bytes, content_type: str) -> None:
+    contenido = _cifrar(contenido)
+
     if _usa_s3():
         _s3_client().put_object(
             Bucket=settings.MINIO_BUCKET, Key=key, Body=contenido, ContentType=content_type,
@@ -54,7 +81,12 @@ def guardar(key: str, contenido: bytes, content_type: str) -> None:
 
 
 def leer(key: str) -> bytes | None:
-    """Devuelve el contenido del archivo, o None si no existe."""
+    """Devuelve el contenido descifrado del archivo, o None si no existe."""
+    almacenado = _leer_almacenado(key)
+    return None if almacenado is None else _descifrar(key, almacenado)
+
+
+def _leer_almacenado(key: str) -> bytes | None:
     if _usa_s3():
         try:
             objeto = _s3_client().get_object(Bucket=settings.MINIO_BUCKET, Key=key)
